@@ -3,1612 +3,1205 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SimuAir-Gaussian Pro | Simulador Educativo de Dispersión Atmosférica</title>
+    <title>Simulador de Dispersión Gaussiana de Contaminantes</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Three.js -->
+    <!-- Three.js for 3D visualization -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Three.js OrbitControls -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <!-- FontAwesome Icons -->
+    <!-- Chart.js for 2D standard profiles -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- KaTeX for math rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <!-- FontAwesome icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- MathJax for rendering equations -->
-    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
-
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#f0f9ff',
-                            100: '#e0f2fe',
-                            500: '#0284c7',
-                            600: '#0284c7',
-                            700: '#0369a1',
-                            900: '#0c4a6e',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
     <style>
-        body {
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            background-color: #0f172a;
-            color: #f8fafc;
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'JetBrains+Mono', monospace; }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #1e293b;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #475569;
-            border-radius: 4px;
-        }
-        .tab-btn.active {
-            border-bottom: 3px solid #38bdf8;
-            color: #38bdf8;
-            font-weight: 600;
-        }
-        canvas {
-            border-radius: 0.5rem;
+        
+        .slider-thumb::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
         }
     </style>
 </head>
-<body class="h-screen flex flex-col overflow-hidden bg-slate-950 text-slate-100">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col overflow-x-hidden">
 
-    <!-- Top Navigation Header -->
-    <header class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex items-center justify-between shadow-lg z-10">
-        <div class="flex items-center space-x-3">
-            <div class="p-2 bg-sky-500/20 text-sky-400 rounded-lg border border-sky-500/30">
-                <i class="fa-solid fa-wind text-2xl"></i>
+    <!-- HEADER -->
+    <header class="bg-slate-900/90 border-b border-slate-800 px-6 py-4 sticky top-0 z-50 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="p-2.5 bg-blue-600/20 border border-blue-500/40 rounded-xl text-blue-400">
+                    <i class="fa-solid fa-wind text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                        Simulador de Dispersión Gaussiana
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                            Modelo de Pluma
+                        </span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Visualización interactiva de plumas atmosféricas, coeficientes $\sigma_y, \sigma_z$ y casos límite</p>
+                </div>
             </div>
-            <div>
-                <h1 class="text-xl font-bold bg-gradient-to-r from-sky-400 to-indigo-300 bg-clip-text text-transparent">
-                    SimuAir-Gaussian Pro
-                </h1>
-                <p class="text-xs text-slate-400">Simulador Interactivo de Dispersión Atmosférica &amp; Laboratorio Educativo</p>
+
+            <!-- Header Quick Stats -->
+            <div class="flex items-center gap-4 bg-slate-950/60 px-4 py-2 rounded-xl border border-slate-800 text-xs">
+                <div class="text-center">
+                    <span class="text-slate-400 block">Altura Efectiva ($H$)</span>
+                    <span id="header-H" class="font-mono font-bold text-blue-400 text-sm">60.0 m</span>
+                </div>
+                <div class="h-6 w-px bg-slate-800"></div>
+                <div class="text-center">
+                    <span class="text-slate-400 block">Concentración P-Muestreo</span>
+                    <span id="header-C" class="font-mono font-bold text-emerald-400 text-sm">0.00 $\mu g/m^3$</span>
+                </div>
+                <div class="h-6 w-px bg-slate-800"></div>
+                <div class="text-center">
+                    <span class="text-slate-400 block">Distancia $C_{max}$ Terrestre</span>
+                    <span id="header-Xmax" class="font-mono font-bold text-amber-400 text-sm">-- m</span>
+                </div>
             </div>
-        </div>
-
-        <!-- Navigation Tabs -->
-        <nav class="flex space-x-6 text-sm font-medium">
-            <button id="nav-sim" onclick="switchMainTab('sim')" class="tab-btn active px-3 py-2 transition flex items-center gap-2">
-                <i class="fa-solid fa-sliders"></i> Simulador Interactivo
-            </button>
-            <button id="nav-theory" onclick="switchMainTab('theory')" class="tab-btn text-slate-400 hover:text-slate-200 px-3 py-2 transition flex items-center gap-2">
-                <i class="fa-solid fa-book-open"></i> Fundamentos &amp; Ecuaciones
-            </button>
-            <button id="nav-pedagogy" onclick="switchMainTab('pedagogy')" class="tab-btn text-slate-400 hover:text-slate-200 px-3 py-2 transition flex items-center gap-2">
-                <i class="fa-solid fa-graduation-cap"></i> Guía Pedagógica &amp; Retos
-            </button>
-        </nav>
-
-        <div class="flex items-center space-x-3">
-            <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full flex items-center gap-1">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Modelo Gaussiano Activo
-            </span>
         </div>
     </header>
 
-    <!-- Main Content Container -->
-    <main class="flex-1 flex overflow-hidden relative">
+    <!-- MAIN CONTENT GRID -->
+    <main class="max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow">
 
-        <!-- ================= TAB 1: SIMULATOR INTERFACING ================= -->
-        <div id="tab-sim-content" class="flex-1 flex w-full h-full">
+        <!-- LEFT COLUMN: 3D VIEWPORT & CONTROLS (7 Cols) -->
+        <section class="lg:col-span-7 flex flex-col gap-4">
+            
+            <!-- 3D Canvas Container -->
+            <div class="relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex-grow min-h-[480px] flex flex-col">
+                <!-- Canvas Element -->
+                <div id="canvas-container" class="w-full flex-grow relative cursor-grab active:cursor-grabbing">
+                    <!-- ThreeJS injects canvas here -->
+                </div>
 
-            <!-- Left Controls Sidebar -->
-            <aside class="w-96 bg-slate-900 border-r border-slate-800 flex flex-col h-full z-10 shadow-2xl">
-                
-                <!-- Sidebar Header -->
-                <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-                    <h2 class="font-semibold text-slate-200 text-sm uppercase tracking-wider flex items-center gap-2">
-                        <i class="fa-solid fa-gears text-sky-400"></i> Parámetros del Sistema
-                    </h2>
-                    <button onclick="resetToDefaults()" class="text-xs text-slate-400 hover:text-sky-400 transition flex items-center gap-1" title="Restablecer valores predeterminados">
-                        <i class="fa-solid fa-rotate-left"></i> Reiniciar
+                <!-- Floating Canvas Overlay Controls -->
+                <div class="absolute top-4 left-4 z-10 flex flex-wrap gap-2">
+                    <button id="btn-toggle-envelope" class="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-xs text-slate-200 rounded-lg border border-slate-700 backdrop-blur transition flex items-center gap-1.5 shadow">
+                        <i class="fa-solid fa-layer-group text-blue-400"></i>
+                        <span>Envolvente Envolventes ($1\sigma, 2\sigma, 3\sigma$)</span>
+                    </button>
+                    <button id="btn-toggle-particles" class="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-xs text-slate-200 rounded-lg border border-slate-700 backdrop-blur transition flex items-center gap-1.5 shadow">
+                        <i class="fa-solid fa-braille text-purple-400"></i>
+                        <span>Partículas</span>
+                    </button>
+                    <button id="btn-toggle-reflection" class="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-xs text-slate-200 rounded-lg border border-slate-700 backdrop-blur transition flex items-center gap-1.5 shadow">
+                        <i class="fa-solid fa-arrows-split-up-and-left text-amber-400"></i>
+                        <span>Fuente Espejo (Reflexión)</span>
                     </button>
                 </div>
 
-                <!-- Scrollable Controls List -->
-                <div class="flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar text-xs">
-
-                    <!-- Presets Selection -->
-                    <div class="bg-slate-800/60 p-3 rounded-lg border border-slate-700/60">
-                        <label class="block font-semibold text-slate-300 mb-2 flex items-center justify-between">
-                            <span><i class="fa-solid fa-bookmark text-amber-400 mr-1"></i> Escenarios Predefinidos:</span>
-                        </label>
-                        <select id="preset-select" onchange="loadPreset(this.value)" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-slate-200 focus:outline-none focus:border-sky-500">
-                            <option value="custom">-- Personalizado --</option>
-                            <option value="inversion">Inversión Nocturna Nocturna (Estable F)</option>
-                            <option value="unstable_noon">Día Soleado Inestable (Convección A)</option>
-                            <option value="high_wind">Viento Fuerte Neutro (Clase D)</option>
-                            <option value="urban_tall">Chimenea Industrial Urbana (Clase C)</option>
-                        </select>
-                    </div>
-
-                    <!-- Group 1: Fuente emisora -->
-                    <div class="space-y-3">
-                        <h3 class="font-bold text-sky-400 border-b border-slate-800 pb-1 flex items-center justify-between">
-                            <span><i class="fa-solid fa-industry mr-1"></i> Fuente Emisora</span>
-                        </h3>
-                        
-                        <!-- Emision Q -->
-                        <div>
-                            <div class="flex justify-between mb-1">
-                                <label class="text-slate-300">Tasa Emisión ($Q$):</label>
-                                <span id="val-Q" class="font-mono text-sky-300 font-bold">100.0 g/s</span>
-                            </div>
-                            <input type="range" id="input-Q" min="10" max="1000" step="10" value="100" oninput="updateSimulation()" class="w-full accent-sky-500">
-                        </div>
-
-                        <!-- Altura Chimenea h -->
-                        <div>
-                            <div class="flex justify-between mb-1">
-                                <label class="text-slate-300">Altura Chimenea ($h_s$):</label>
-                                <span id="val-hs" class="font-mono text-sky-300 font-bold">50 m</span>
-                            </div>
-                            <input type="range" id="input-hs" min="10" max="250" step="5" value="50" oninput="updateSimulation()" class="w-full accent-sky-500">
-                        </div>
-
-                        <!-- Temp Salida Ts -->
-                        <div>
-                            <div class="flex justify-between mb-1">
-                                <label class="text-slate-300">Temp. Gases ($T_s$):</label>
-                                <span id="val-Ts" class="font-mono text-sky-300 font-bold">120 °C</span>
-                            </div>
-                            <input type="range" id="input-Ts" min="20" max="300" step="5" value="120" oninput="updateSimulation()" class="w-full accent-sky-500">
-                        </div>
-
-                        <!-- Velocidad Salida Vs -->
-                        <div>
-                            <div class="flex justify-between mb-1">
-                                <label class="text-slate-300">Velocidad Salida ($v_s$):</label>
-                                <span id="val-vs" class="font-mono text-sky-300 font-bold">12.0 m/s</span>
-                            </div>
-                            <input type="range" id="input-vs" min="1" max="30" step="0.5" value="12" oninput="updateSimulation()" class="w-full accent-sky-500">
-                        </div>
-
-                        <!-- Diámetro d -->
-                        <div>
-                            <div class="flex justify-between mb-1">
-                                <label class="text-slate-300">Diámetro Chimenea ($d$):</label>
-                                <span id="val-d" class="font-mono text-sky-300 font-bold">2.5 m</span>
-                            </div>
-                            <input type="range" id="input-d" min="0.5" max="8.0" step="0.1" value="2.5" oninput="updateSimulation()" class="w-full accent-sky-500">
-                        </div>
-                    </div>
-
-                    <!-- Group 2: Condiciones Meteorológicas -->
-                    <div class="space-y-3">
-                        <h3 class="font-bold text-sky-400 border-b border-slate-800 pb-1">
-                            <i class="fa-solid fa-cloud-sun-rain mr-1"></i> Meteorología Atmosférica
-                        </h3>
-
-                        <!-- Velocidad del viento u -->
-                        <div>
-                            <div class="flex justify-between mb-1">
-                                <label class="text-slate-300">Velocidad Viento ($u$):</label>
-                                <span id="val-u" class="font-mono text-sky-300 font-bold">4.0 m/s</span>
-                            </div>
-                            <input type="range" id="input-u" min="0.5" max="25" step="0.5" value="4.0" oninput="updateSimulation()" class="w-full accent-sky-500">
-                        </div>
-
-                        <!-- Dirección Viento -->
-                        <div>
-                            <div class="flex justify-between mb-1">
-                                <label class="text-slate-300">Dirección Viento ($\theta$):</label>
-                                <span id="val-dir" class="font-mono text-sky-300 font-bold">270° (Oeste)</span>
-                            </div>
-                            <input type="range" id="input-dir" min="0" max="359" step="5" value="270" oninput="updateSimulation()" class="w-full accent-sky-500">
-                        </div>
-
-                        <!-- Estabilidad Pasquill -->
-                        <div>
-                            <label class="block text-slate-300 mb-1">Estabilidad Pasquill-Gifford:</label>
-                            <select id="input-stability" onchange="updateSimulation()" class="w-full bg-slate-950 border border-slate-700 rounded p-1.5 text-slate-200 focus:outline-none focus:border-sky-500">
-                                <option value="A">A - Muy Inestable (Fuerte radiación)</option>
-                                <option value="B">B - Moderadamente Inestable</option>
-                                <option value="C">C - Ligeramente Inestable</option>
-                                <option value="D" selected>D - Neutra (Día nublado / Viento)</option>
-                                <option value="E">E - Ligeramente Estable (Noche)</option>
-                                <option value="F">F - Muy Estable (Inversión nocturna)</option>
-                            </select>
-                        </div>
-
-                        <!-- Temp Ambiente Ta -->
-                        <div>
-                            <div class="flex justify-between mb-1">
-                                <label class="text-slate-300">Temp. Ambiente ($T_a$):</label>
-                                <span id="val-Ta" class="font-mono text-sky-300 font-bold">20 °C</span>
-                            </div>
-                            <input type="range" id="input-Ta" min="-10" max="45" step="1" value="20" oninput="updateSimulation()" class="w-full accent-sky-500">
-                        </div>
-
-                        <!-- Humedad Relativa -->
-                        <div>
-                            <div class="flex justify-between mb-1">
-                                <label class="text-slate-300">Humedad Relativa ($HR$):</label>
-                                <span id="val-rh" class="font-mono text-sky-300 font-bold">60 %</span>
-                            </div>
-                            <input type="range" id="input-rh" min="10" max="100" step="5" value="60" oninput="updateSimulation()" class="w-full accent-sky-500">
-                        </div>
-                    </div>
-
-                    <!-- Group 3: Topografía y Entorno -->
-                    <div class="space-y-3">
-                        <h3 class="font-bold text-sky-400 border-b border-slate-800 pb-1">
-                            <i class="fa-solid fa-mountain-city mr-1"></i> Topografía y Entorno
-                        </h3>
-
-                        <div>
-                            <label class="block text-slate-300 mb-1">Tipo de Terreno / Rugosidad ($z_0$):</label>
-                            <select id="input-terrain" onchange="updateSimulation()" class="w-full bg-slate-950 border border-slate-700 rounded p-1.5 text-slate-200 focus:outline-none focus:border-sky-500">
-                                <option value="flat_rural" selected>Rural - Terreno Plano ($z_0 = 0.1\,m$)</option>
-                                <option value="urban">Urbano / Industrial ($z_0 = 1.0\,m$)</option>
-                                <option value="complex">Terreno Complejo con Colina ($z_0 = 0.5\,m$)</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <div class="flex justify-between mb-1">
-                                <label class="text-slate-300">Distancia Máxima de Análisis:</label>
-                                <span id="val-xmax" class="font-mono text-sky-300 font-bold">5000 m</span>
-                            </div>
-                            <input type="range" id="input-xmax" min="1000" max="15000" step="500" value="5000" oninput="updateSimulation()" class="w-full accent-sky-500">
-                        </div>
-                    </div>
-
-                    <!-- Scenario Comparison Toggle -->
-                    <div class="pt-2 border-t border-slate-800">
-                        <button id="btn-compare" onclick="toggleScenarioComparison()" class="w-full py-2 px-3 bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/50 rounded-lg text-indigo-200 font-medium transition flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-code-compare"></i> <span id="lbl-compare">Guardar como Escenario A para Comparar</span>
-                        </button>
-                    </div>
-
-                </div>
-            </aside>
-
-            <!-- Main Display Area -->
-            <section class="flex-1 flex flex-col h-full overflow-hidden bg-slate-950">
-                
-                <!-- KPI Indicators Top Bar -->
-                <div class="grid grid-cols-2 md:grid-cols-5 gap-3 p-4 bg-slate-900/80 border-b border-slate-800 text-xs">
-                    <div class="bg-slate-800/80 p-2.5 rounded-lg border border-slate-700">
-                        <span class="text-slate-400 block text-[10px] uppercase font-bold">Conc. Máx. Superficie</span>
-                        <div class="flex items-baseline gap-1 mt-0.5">
-                            <span id="kpi-cmax" class="text-lg font-extrabold font-mono text-amber-400">0.0</span>
-                            <span class="text-slate-400 text-[10px]">µg/m³</span>
-                        </div>
-                    </div>
-
-                    <div class="bg-slate-800/80 p-2.5 rounded-lg border border-slate-700">
-                        <span class="text-slate-400 block text-[10px] uppercase font-bold">Distancia del Máximo</span>
-                        <div class="flex items-baseline gap-1 mt-0.5">
-                            <span id="kpi-xmax" class="text-lg font-extrabold font-mono text-sky-400">0</span>
-                            <span class="text-slate-400 text-[10px]">m</span>
-                        </div>
-                    </div>
-
-                    <div class="bg-slate-800/80 p-2.5 rounded-lg border border-slate-700">
-                        <span class="text-slate-400 block text-[10px] uppercase font-bold">Sobreelevación Pluma ($\Delta h$)</span>
-                        <div class="flex items-baseline gap-1 mt-0.5">
-                            <span id="kpi-deltah" class="text-lg font-extrabold font-mono text-emerald-400">0.0</span>
-                            <span class="text-slate-400 text-[10px]">m</span>
-                        </div>
-                    </div>
-
-                    <div class="bg-slate-800/80 p-2.5 rounded-lg border border-slate-700">
-                        <span class="text-slate-400 block text-[10px] uppercase font-bold">Altura Efectiva ($H$)</span>
-                        <div class="flex items-baseline gap-1 mt-0.5">
-                            <span id="kpi-H" class="text-lg font-extrabold font-mono text-indigo-400">0.0</span>
-                            <span class="text-slate-400 text-[10px]">m</span>
-                        </div>
-                    </div>
-
-                    <div class="bg-slate-800/80 p-2.5 rounded-lg border border-slate-700 col-span-2 md:col-span-1 flex flex-col justify-center">
-                        <span class="text-slate-400 block text-[10px] uppercase font-bold">Norma Calidad Aire (100 µg/m³)</span>
-                        <div id="kpi-norm-badge" class="mt-1 font-bold text-xs px-2 py-0.5 rounded text-center bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                            DENTRO DEL LÍMITE
-                        </div>
-                    </div>
+                <div class="absolute top-4 right-4 z-10">
+                    <button id="btn-reset-cam" class="p-2 bg-slate-800/80 hover:bg-slate-700 text-xs text-slate-300 rounded-lg border border-slate-700 backdrop-blur transition shadow" title="Reiniciar Cámara">
+                        <i class="fa-solid fa-video font-bold"></i>
+                    </button>
                 </div>
 
-                <!-- Visualization Split Layout (Top: 3D/2D views, Bottom: Graph & Feedback) -->
-                <div class="flex-1 grid grid-rows-2 gap-3 p-4 overflow-hidden">
-                    
-                    <!-- Upper Viewports (3D Render & 2D Profile Canvas) -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 h-full overflow-hidden">
-                        
-                        <!-- 3D Interactive Scene Viewport -->
-                        <div class="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden relative shadow-inner">
-                            <div class="bg-slate-900/90 px-3 py-1.5 border-b border-slate-800 flex justify-between items-center z-10 text-xs">
-                                <span class="font-semibold text-slate-300 flex items-center gap-1.5">
-                                    <i class="fa-solid fa-cube text-sky-400"></i> Visualización 3D Interactiva de la Pluma (Flujo Continuo)
-                                </span>
-                                <div class="flex items-center gap-2 text-[10px] text-slate-400">
-                                    <span id="3d-wind-badge" class="bg-sky-500/10 text-sky-300 px-2 py-0.5 rounded border border-sky-500/20 font-mono">
-                                        Viento &rarr; 270° | 4.0 m/s
-                                    </span>
-                                </div>
-                            </div>
-                            <div id="threejs-container" class="w-full flex-1 relative bg-slate-950">
-                                <!-- Three.js canvas injected here -->
-                                <div id="3d-legend" class="absolute bottom-3 left-3 bg-slate-900/95 border border-slate-700/80 p-2.5 rounded-lg text-[10px] backdrop-blur shadow-xl space-y-1.5 z-10">
-                                    <div class="font-bold text-slate-200 flex items-center justify-between gap-2">
-                                        <span>Concentración $C(x,y,z)$:</span>
-                                        <span class="text-slate-400 font-mono font-normal">µg/m³</span>
-                                    </div>
-                                    <div class="flex items-center gap-1">
-                                        <div class="w-24 h-3 bg-gradient-to-r from-sky-500 via-emerald-400 via-amber-400 to-red-600 rounded border border-slate-700"></div>
-                                    </div>
-                                    <div class="flex justify-between text-[9px] text-slate-400 font-mono">
-                                        <span>0</span>
-                                        <span>50</span>
-                                        <span>100+</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- 2D Side & Top View Profiles -->
-                        <div class="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
-                            <div class="bg-slate-900/90 px-3 py-1.5 border-b border-slate-800 flex justify-between items-center text-xs">
-                                <span class="font-semibold text-slate-300 flex items-center gap-1.5">
-                                    <i class="fa-solid fa-layer-group text-sky-400"></i> Perfil Lateral 2D ($x-z$) &amp; Campo de Concentraciones
-                                </span>
-                                <span class="text-[10px] text-slate-400">Escalas adaptativas | Eje $x$: Distancia (m) | Eje $z$: Altura (m)</span>
-                            </div>
-                            <div class="flex-1 p-2 relative flex items-center justify-center bg-slate-950">
-                                <canvas id="canvas2d" class="w-full h-full object-contain"></canvas>
-                            </div>
-                        </div>
-
+                <!-- 3D Legend overlay -->
+                <div class="absolute bottom-4 left-4 z-10 bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-xs text-slate-300 backdrop-blur space-y-1 shadow-lg">
+                    <div class="font-semibold text-slate-200 mb-1 flex items-center gap-1.5">
+                        <i class="fa-solid fa-circle-info text-blue-400"></i> Leyenda 3D:
                     </div>
-
-                    <!-- Lower Section (Dynamic Chart & Automated Physical Feedback) -->
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 h-full overflow-hidden">
-                        
-                        <!-- Dynamic Graph Panel (Chart.js) -->
-                        <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
-                            <div class="bg-slate-900/90 px-3 py-1.5 border-b border-slate-800 flex justify-between items-center text-xs">
-                                <span class="font-semibold text-slate-300 flex items-center gap-1.5">
-                                    <i class="fa-solid fa-chart-line text-sky-400"></i> Curva de Concentración en Superficie ($C$ vs $x$ en la Línea Central)
-                                </span>
-                                <div id="comp-legend-tag" class="hidden text-[10px] px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded">
-                                    Modo Comparativo Activo
-                                </div>
-                            </div>
-                            <div class="flex-1 p-2 relative bg-slate-950">
-                                <canvas id="chart-concentration"></canvas>
-                            </div>
-                        </div>
-
-                        <!-- Automated Physical Explanatory Feedback -->
-                        <div class="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden p-3 custom-scrollbar overflow-y-auto">
-                            <h3 class="text-xs font-bold text-sky-400 uppercase tracking-wider mb-2 flex items-center gap-1.5 border-b border-slate-800 pb-1.5">
-                                <i class="fa-solid fa-brain"></i> Análisis Físico en Tiempo Real
-                            </h3>
-                            <div id="feedback-content" class="text-xs text-slate-300 space-y-2 leading-relaxed">
-                                <!-- Dynamic dynamic explanatory content inserted via JS -->
-                            </div>
-                        </div>
-
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full bg-slate-400 inline-block border border-slate-200"></span>
+                        <span>Chimenea ($h_s$) & Elevación ($\Delta h$)</span>
                     </div>
-
-                </div>
-
-            </section>
-
-        </div>
-
-        <!-- ================= TAB 2: THEORY & EQUATIONS ================= -->
-        <div id="tab-theory-content" class="hidden flex-1 p-6 overflow-y-auto custom-scrollbar bg-slate-950">
-            <div class="max-w-5xl mx-auto space-y-8">
-                
-                <!-- Header Theory -->
-                <div class="border-b border-slate-800 pb-4">
-                    <h2 class="text-2xl font-bold text-sky-400">Fundamentos Físicos del Modelo Gaussiano de Dispersión</h2>
-                    <p class="text-sm text-slate-400 mt-1">
-                        El modelo gaussiano es el estándar regulatorio fundamental para estimar la concentración de contaminantes no reactivos emitidos por fuentes puntuales en estado estacionario.
-                    </p>
-                </div>
-
-                <!-- Main Equation Card -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-                    <h3 class="text-lg font-semibold text-slate-200">Ecuación General de Dispersión Atmosférica</h3>
-                    <p class="text-xs text-slate-300 leading-relaxed">
-                        Para una fuente puntual ubicada en $(0, 0, h_s)$ que emite de forma continua a una tasa $Q$ en un campo de viento uniforme $u$, la concentración en el punto receptor $(x, y, z)$ considerando reflexión perfecta en el suelo está dada por:
-                    </p>
-                    <div class="bg-slate-950 p-4 rounded-lg border border-slate-800 text-center font-mono text-sky-300 text-sm overflow-x-auto">
-                        $$C(x,y,z) = \frac{Q}{2\pi u \sigma_y \sigma_z} \exp\left( \frac{-y^2}{2\sigma_y^2} \right) \left[ \exp\left( \frac{-(z-H)^2}{2\sigma_z^2} \right) + \exp\left( \frac{-(z+H)^2}{2\sigma_z^2} \right) \right]$$
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full bg-blue-500/60 inline-block border border-blue-400"></span>
+                        <span>Pluma Gaussiana ($\sigma_y, \sigma_z$)</span>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-400 pt-2">
-                        <div>
-                            <strong class="text-slate-200">En la Línea Central ($y = 0$) y a Nivel de Suelo ($z = 0$):</strong>
-                            <div class="bg-slate-950 p-2 mt-1 rounded border border-slate-800 font-mono text-emerald-400 text-center">
-                                $$C(x,0,0) = \frac{Q}{\pi u \sigma_y \sigma_z} \exp\left( \frac{-H^2}{2\sigma_z^2} \right)$$
-                            </div>
-                        </div>
-                        <div>
-                            <strong class="text-slate-200">Altura Efectiva de la Pluma ($H$):</strong>
-                            <p class="mt-1">
-                                $$H = h_s + \Delta h$$
-                                donde $h_s$ es la altura física de la chimenea y $\Delta h$ es la sobreelevación causada por el impulso térmico y mecánico del gas saliente.
-                            </p>
-                        </div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full bg-emerald-400 inline-block"></span>
+                        <span>Punto Muestra $P(x,y,z)$</span>
                     </div>
                 </div>
-
-                <!-- Dispersion Parameters Table & Explanation -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-                    <h3 class="text-lg font-semibold text-slate-200">Coeficientes de Dispersión ($\sigma_y, \sigma_z$) y Estabilidad de Pasquill-Gifford</h3>
-                    <p class="text-xs text-slate-300 leading-relaxed">
-                        Los desviación estándar de la distribución de concentración, $\sigma_y(x)$ (horizontal) y $\sigma_z(x)$ (vertical), crecen en función de la distancia sotavento ($x$) y dependen críticamente de la turbulencia atmosférica descrita por las 6 Clases de Estabilidad (A a F):
-                    </p>
-
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-xs text-left border-collapse border border-slate-800">
-                            <thead>
-                                <tr class="bg-slate-800 text-sky-300 border-b border-slate-700">
-                                    <th class="p-2 border border-slate-700">Clase</th>
-                                    <th class="p-2 border border-slate-700">Estabilidad</th>
-                                    <th class="p-2 border border-slate-700">Condición Diurna/Nocturna</th>
-                                    <th class="p-2 border border-slate-700">Turbulencia Predominante</th>
-                                    <th class="p-2 border border-slate-700">Comportamiento de la Pluma</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-800 text-slate-300">
-                                <tr>
-                                    <td class="p-2 font-bold text-red-400 border border-slate-800">A</td>
-                                    <td class="p-2 border border-slate-800">Muy Inestable</td>
-                                    <td class="p-2 border border-slate-800">Día soleado, radiación solar fuerte, viento débil</td>
-                                    <td class="p-2 border border-slate-800">Térmica / Convectiva masiva</td>
-                                    <td class="p-2 border border-slate-800">Looping (Bucles bruscos toque a tierra)</td>
-                                </tr>
-                                <tr>
-                                    <td class="p-2 font-bold text-amber-400 border border-slate-800">B</td>
-                                    <td class="p-2 border border-slate-800">Moderadamente Inestable</td>
-                                    <td class="p-2 border border-slate-800">Día soleado con radiación moderada</td>
-                                    <td class="p-2 border border-slate-800">Térmica &gt; Mecánica</td>
-                                    <td class="p-2 border border-slate-800">Convección moderada</td>
-                                </tr>
-                                <tr>
-                                    <td class="p-2 font-bold text-yellow-300 border border-slate-800">C</td>
-                                    <td class="p-2 border border-slate-800">Ligeramente Inestable</td>
-                                    <td class="p-2 border border-slate-800">Día soleado con radiación débil o viento moderado</td>
-                                    <td class="p-2 border border-slate-800">Mixta</td>
-                                    <td class="p-2 border border-slate-800">Mezcla equilibrada</td>
-                                </tr>
-                                <tr>
-                                    <td class="p-2 font-bold text-emerald-400 border border-slate-800">D</td>
-                                    <td class="p-2 border border-slate-800">Neutra</td>
-                                    <td class="p-2 border border-slate-800">Día o noche muy nublado, o vientos fuertes ($u &gt; 6\,m/s$)</td>
-                                    <td class="p-2 border border-slate-800">Mecánica (Cizalladura)</td>
-                                    <td class="p-2 border border-slate-800">Cono Simonés (Coning)</td>
-                                </tr>
-                                <tr>
-                                    <td class="p-2 font-bold text-cyan-400 border border-slate-800">E</td>
-                                    <td class="p-2 border border-slate-800">Ligeramente Estable</td>
-                                    <td class="p-2 border border-slate-800">Noche con nubosidad parcial</td>
-                                    <td class="p-2 border border-slate-800">Amortiguada</td>
-                                    <td class="p-2 border border-slate-800">Abanico (Fanning)</td>
-                                </tr>
-                                <tr>
-                                    <td class="p-2 font-bold text-indigo-400 border border-slate-800">F</td>
-                                    <td class="p-2 border border-slate-800">Muy Estable</td>
-                                    <td class="p-2 border border-slate-800">Noche despejada, viento débil (Inversión Térmica)</td>
-                                    <td class="p-2 border border-slate-800">Casi nula / Turbulencia reprimida</td>
-                                    <td class="p-2 border border-slate-800">Pluma delgada, transporte a larga distancia</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Assumptions & Limitations Card -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-                    <h3 class="text-lg font-semibold text-amber-400 flex items-center gap-2">
-                        <i class="fa-solid fa-triangle-exclamation"></i> Supuestos del Modelo y Limitaciones frente al Mundo Real
-                    </h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-300">
-                        <div class="bg-slate-950 p-4 rounded border border-slate-800 space-y-2">
-                            <strong class="text-sky-300 block border-b border-slate-800 pb-1">Supuestos Teóricos:</strong>
-                            <ul class="list-disc pl-4 space-y-1 text-slate-400">
-                                <li><strong>Estado Estacionario:</strong> Tasa de emisión $Q$ y condiciones meteorológicas constantes en el tiempo.</li>
-                                <li><strong>Conservación de Masa:</strong> Contaminante inerte (sin degradación química ni deposición).</li>
-                                <li><strong>Campo de Viento Homogéneo:</strong> Dirección y velocidad $u$ constantes en todo el dominio espacial.</li>
-                                <li><strong>Reflexión Perfecta:</strong> El suelo actúa como un espejo impenetrable sin adsorción.</li>
-                            </ul>
-                        </div>
-                        <div class="bg-slate-950 p-4 rounded border border-slate-800 space-y-2">
-                            <strong class="text-amber-400 block border-b border-slate-800 pb-1">Limitaciones en la Práctica:</strong>
-                            <ul class="list-disc pl-4 space-y-1 text-slate-400">
-                                <li><strong>No aplica en Vientos Calmos ($u &lt; 0.5\,m/s$):</strong> La división por $u$ en la fórmula diverge a infinito.</li>
-                                <li><strong>Química Compleja:</strong> No simula la formación de contaminantes secundarios como Ozono ($O_3$) o Nitratos.</li>
-                                <li><strong>Orografía Compleja:</strong> No captura estelas de estancamiento tras montañas o valles profundos.</li>
-                                <li><strong>Efectos Transitorios:</strong> Cambios bruscos de viento o frentes meteorológicos no son representados.</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-
             </div>
-        </div>
 
-        <!-- ================= TAB 3: PEDAGOGY & CHALLENGES ================= -->
-        <div id="tab-pedagogy-content" class="hidden flex-1 p-6 overflow-y-auto custom-scrollbar bg-slate-950">
-            <div class="max-w-5xl mx-auto space-y-8">
-                
-                <!-- Pedagogical Header -->
-                <div class="border-b border-slate-800 pb-4">
-                    <h2 class="text-2xl font-bold text-sky-400">Diseño Instruccional, Errores Comunes &amp; Retos de Optimización</h2>
-                    <p class="text-sm text-slate-400 mt-1">
-                        Esta sección guía al estudiante a través de la física intuitiva de la atmósfera, deconstruye prejuicios erróneos y evalúa su capacidad de toma de decisiones en ingeniería ambiental.
+            <!-- Sampling Point Readout Bar -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                <div>
+                    <span class="text-slate-400">Posición $x$ (Sotavento):</span>
+                    <p id="val-disp-x" class="font-mono text-sm font-semibold text-slate-100">500 m</p>
+                </div>
+                <div>
+                    <span class="text-slate-400">Posición $y$ (Transversal):</span>
+                    <p id="val-disp-y" class="font-mono text-sm font-semibold text-slate-100">0 m</p>
+                </div>
+                <div>
+                    <span class="text-slate-400">Posición $z$ (Vertical):</span>
+                    <p id="val-disp-z" class="font-mono text-sm font-semibold text-slate-100">0 m</p>
+                </div>
+                <div class="bg-blue-950/50 p-2 rounded-lg border border-blue-800/40">
+                    <span class="text-blue-300 font-semibold">Desviaciones ($\sigma$):</span>
+                    <p id="val-disp-sigmas" class="font-mono text-xs text-blue-200 mt-0.5">$\sigma_y$: 36.4m | $\sigma_z$: 18.2m</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- RIGHT COLUMN: PARAMETERS & PRESETS (5 Cols) -->
+        <section class="lg:col-span-5 flex flex-col gap-5">
+            
+            <!-- Quick Presets Panel (Casos Límites) -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
+                <h2 class="text-sm font-bold text-slate-200 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-bullseye text-amber-400"></i>
+                    Casos Límite y Condición de Contorno
+                </h2>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <button id="preset-ground" class="p-2.5 bg-slate-800/90 hover:bg-slate-700/80 border border-slate-700/80 rounded-xl text-left transition group">
+                        <div class="font-semibold text-blue-300 group-hover:text-blue-200">1. Nivel del Suelo</div>
+                        <div class="text-[11px] text-slate-400">$z = 0$ (Reflexión terrestre)</div>
+                    </button>
+                    <button id="preset-centerline" class="p-2.5 bg-slate-800/90 hover:bg-slate-700/80 border border-slate-700/80 rounded-xl text-left transition group">
+                        <div class="font-semibold text-purple-300 group-hover:text-purple-200">2. Línea Central</div>
+                        <div class="text-[11px] text-slate-400">$y = 0$ (Eje del viento)</div>
+                    </button>
+                    <button id="preset-ground-center" class="p-2.5 bg-slate-800/90 hover:bg-slate-700/80 border border-slate-700/80 rounded-xl text-left transition group">
+                        <div class="font-semibold text-emerald-300 group-hover:text-emerald-200">3. Suelo y Eje Central</div>
+                        <div class="text-[11px] text-slate-400">$y = 0, z = 0$</div>
+                    </button>
+                    <button id="preset-cmax" class="p-2.5 bg-amber-950/40 hover:bg-amber-900/50 border border-amber-800/50 rounded-xl text-left transition group">
+                        <div class="font-semibold text-amber-300 group-hover:text-amber-200">4. Máxima Suelo ($C_{max}$)</div>
+                        <div class="text-[11px] text-amber-400/80">$x = x_{max}, y=0, z=0$</div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Interactive Parameters Control Panel -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4 flex-grow">
+                <h2 class="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center justify-between">
+                    <span class="flex items-center gap-2">
+                        <i class="fa-solid fa-sliders text-blue-400"></i>
+                        Parámetros del Sistema
+                    </span>
+                    <button id="btn-reset-params" class="text-xs text-slate-400 hover:text-white transition underline">Restablecer</button>
+                </h2>
+
+                <!-- Atmospheric Stability Class Selector -->
+                <div>
+                    <label class="text-xs font-semibold text-slate-300 flex justify-between mb-1.5">
+                        <span>Clase de Estabilidad Atmosférica (Pasquill-Gifford)</span>
+                        <span id="lbl-stability-desc" class="text-blue-400 font-bold">D (Neutra)</span>
+                    </label>
+                    <div class="grid grid-cols-6 gap-1.5" id="stability-buttons">
+                        <button data-stab="A" class="stab-btn py-1.5 text-xs font-bold rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:border-blue-500">A</button>
+                        <button data-stab="B" class="stab-btn py-1.5 text-xs font-bold rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:border-blue-500">B</button>
+                        <button data-stab="C" class="stab-btn py-1.5 text-xs font-bold rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:border-blue-500">C</button>
+                        <button data-stab="D" class="stab-btn py-1.5 text-xs font-bold rounded-lg border border-blue-500 bg-blue-600/30 text-blue-300">D</button>
+                        <button data-stab="E" class="stab-btn py-1.5 text-xs font-bold rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:border-blue-500">E</button>
+                        <button data-stab="F" class="stab-btn py-1.5 text-xs font-bold rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:border-blue-500">F</button>
+                    </div>
+                    <p id="stability-info" class="text-[11px] text-slate-400 mt-1.5 italic">
+                        D: Estabilidad Neutra - Cielos cubiertos o viento moderado a fuerte.
                     </p>
                 </div>
 
-                <!-- Learning Objectives & Misconceptions Grid -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    
-                    <!-- Objectives -->
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
-                        <h3 class="font-bold text-emerald-400 flex items-center gap-2">
-                            <i class="fa-solid fa-bullseye"></i> Objetivos de Aprendizaje
-                        </h3>
-                        <ul class="text-xs text-slate-300 space-y-2 list-disc pl-4 leading-relaxed">
-                            <li><strong>Comprender</strong> el balance entre dilución por viento y dispersión por turbulencia térmica/mecánica.</li>
-                            <li><strong>Evaluar</strong> el impacto de la elevación efectiva de chimenea ($\Delta h$) en la reducción del pico de concentración a nivel del suelo.</li>
-                            <li><strong>Analizar</strong> la relación inversa entre la estabilidad atmosférica y la distancia donde ocurre la máxima concentración impacto.</li>
-                            <li><strong>Diseñar</strong> estrategias de mitigación operacional ante eventos de contingencia ambiental.</li>
-                        </ul>
+                <hr class="border-slate-800">
+
+                <!-- Sliders Grid -->
+                <div class="space-y-3.5 text-xs">
+                    <!-- Q: Emission Rate -->
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-slate-300 font-medium">Tasa de Emisión ($Q$):</span>
+                            <span id="val-q" class="font-mono text-blue-400 font-bold">100.0 g/s</span>
+                        </div>
+                        <input type="range" id="input-q" min="10" max="500" step="5" value="100" class="w-full accent-blue-500 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer">
                     </div>
 
-                    <!-- Common Misconceptions -->
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
-                        <h3 class="font-bold text-amber-400 flex items-center gap-2">
-                            <i class="fa-solid fa-lightbulb"></i> Conceptos Erróneos Comunes
-                        </h3>
-                        <div class="text-xs space-y-3">
-                            <div class="bg-slate-950 p-2.5 rounded border border-slate-800">
-                                <span class="text-red-400 font-bold block">mito 1: "A mayor velocidad del viento, mayor es la contaminación."</span>
-                                <p class="text-slate-400 mt-0.5"><strong>Realidad:</strong> El viento actúa como diluyente directo ($C \propto 1/u$). Un viento más fuerte estira la masa emitida en un mayor volumen de aire, reduciendo la concentración instantánea.</p>
+                    <!-- u: Wind Speed -->
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-slate-300 font-medium">Velocidad del Viento ($u$):</span>
+                            <span id="val-u" class="font-mono text-blue-400 font-bold">5.0 m/s</span>
+                        </div>
+                        <input type="range" id="input-u" min="1" max="25" step="0.5" value="5" class="w-full accent-blue-500 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer">
+                    </div>
+
+                    <!-- Stack Heights -->
+                    <div class="grid grid-cols-2 gap-3 pt-1">
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-slate-300 font-medium">Física Chimenea ($h_s$):</span>
+                                <span id="val-hs" class="font-mono text-slate-200 font-bold">50 m</span>
                             </div>
-                            <div class="bg-slate-950 p-2.5 rounded border border-slate-800">
-                                <span class="text-red-400 font-bold block">Mito 2: "Construir una chimenea más alta destruye el contaminante."</span>
-                                <p class="text-slate-400 mt-0.5"><strong>Realidad:</strong> La chimenea no destruye contaminante; sólo desplaza la pluma más arriba, permitiendo mayor tiempo de dilución antes de tocar el suelo y alejando el punto del impacto máximo.</p>
+                            <input type="range" id="input-hs" min="10" max="150" step="5" value="50" class="w-full accent-blue-500 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-slate-300 font-medium">Elevación Pluma ($\Delta h$):</span>
+                                <span id="val-dh" class="font-mono text-slate-200 font-bold">10 m</span>
                             </div>
+                            <input type="range" id="input-dh" min="0" max="80" step="2" value="10" class="w-full accent-blue-500 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer">
                         </div>
                     </div>
 
-                </div>
+                    <hr class="border-slate-800">
 
-                <!-- Interactive Challenges & Quizzes Section -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
-                    <h3 class="text-lg font-bold text-slate-200 flex items-center gap-2 border-b border-slate-800 pb-2">
-                        <i class="fa-solid fa-trophy text-amber-400"></i> Desafíos de Optimización y Evaluación
-                    </h3>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <!-- Point Coordinates (x, y, z) -->
+                    <div class="space-y-2">
+                        <span class="font-semibold text-slate-200 block text-xs">Punto de Evaluación Muestral $P(x,y,z)$:</span>
                         
-                        <!-- Challenge 1 -->
-                        <div class="bg-slate-950 border border-slate-800 rounded-lg p-4 flex flex-col justify-between space-y-3">
-                            <div>
-                                <div class="flex items-center justify-between mb-2">
-                                    <span class="bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded text-[10px]">RETO 1: CONTROL DE NORMA</span>
-                                    <span class="text-slate-500">Dificultad: Media</span>
-                                </div>
-                                <h4 class="font-bold text-slate-200 text-sm">Mitigación de Incidencia Urbana</h4>
-                                <p class="text-slate-400 mt-1">
-                                    Una planta termoeléctrica emite $Q = 200\,g/s$. En condiciones estables (Clase E, $u = 2.5\,m/s$), la concentración en la ciudad cercana supera la norma ($100\,\mu g/m^3$).
-                                </p>
-                                <p class="text-sky-300 font-medium mt-2">
-                                    <strong>Objetivo:</strong> Ajusta la Altura de Chimenea ($h_s$) o la Temp. de Gases ($T_s$) en el simulador para llevar el pico de concentración por debajo de $80\,\mu g/m^3$.
-                                </p>
+                        <!-- X Slider -->
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-slate-400">Distancia Sotavento ($x$):</span>
+                                <span id="val-x" class="font-mono text-emerald-400 font-bold">500 m</span>
                             </div>
-                            <button onclick="switchMainTab('sim'); loadPreset('challenge_1');" class="w-full py-2 bg-sky-600 hover:bg-sky-500 text-white rounded font-semibold transition text-center">
-                                Cargar Escenario del Reto 1
-                            </button>
+                            <input type="range" id="input-x" min="50" max="3000" step="25" value="500" class="w-full accent-emerald-500 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer">
                         </div>
 
-                        <!-- Challenge 2 -->
-                        <div class="bg-slate-950 border border-slate-800 rounded-lg p-4 flex flex-col justify-between space-y-3">
-                            <div>
-                                <div class="flex items-center justify-between mb-2">
-                                    <span class="bg-red-500/20 text-red-300 font-bold px-2 py-0.5 rounded text-[10px]">RETO 2: CRISIS INVERSIÓN NOCTURNA</span>
-                                    <span class="text-slate-500">Dificultad: Avanzada</span>
-                                </div>
-                                <h4 class="font-bold text-slate-200 text-sm">Emergencia por Inversión Térmica</h4>
-                                <p class="text-slate-400 mt-1">
-                                    Durante una noche helada con inversión térmica fuerte (Clase F, viento $u = 1.0\,m/s$), la pluma no se dispersa verticalmente y viaja varios kilómetros intacta.
-                                </p>
-                                <p class="text-amber-300 font-medium mt-2">
-                                    <strong>Objetivo:</strong> Determina cuál es el porcentaje mínimo de reducción de emisión ($Q$) necesario para garantizar la salud a $4000\,m$ de la fuente.
-                                </p>
+                        <!-- Y Slider -->
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-slate-400">Distancia Transversal ($y$):</span>
+                                <span id="val-y" class="font-mono text-emerald-400 font-bold">0 m</span>
                             </div>
-                            <button onclick="switchMainTab('sim'); loadPreset('challenge_2');" class="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white rounded font-semibold transition text-center">
-                                Cargar Escenario del Reto 2
-                            </button>
+                            <input type="range" id="input-y" min="-300" max="300" step="5" value="0" class="w-full accent-emerald-500 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer">
                         </div>
 
+                        <!-- Z Slider -->
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-slate-400">Altura sobre el suelo ($z$):</span>
+                                <span id="val-z" class="font-mono text-emerald-400 font-bold">0 m</span>
+                            </div>
+                            <input type="range" id="input-z" min="0" max="250" step="2" value="0" class="w-full accent-emerald-500 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- BOTTOM SECTION: ANALYTICAL TABS & GRAPHICAL INSIGHTS (12 Cols) -->
+        <section class="lg:col-span-12 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+            
+            <!-- Tab Navigation Bar -->
+            <div class="flex border-b border-slate-800 space-x-6 text-sm font-semibold">
+                <button id="tab-btn-profiles" class="tab-link pb-3 text-blue-400 border-b-2 border-blue-500 transition flex items-center gap-2">
+                    <i class="fa-solid fa-chart-area"></i>
+                    Perfiles Transversales Gaussianos 2D
+                </button>
+                <button id="tab-btn-ground" class="tab-link pb-3 text-slate-400 border-b-2 border-transparent hover:text-slate-200 transition flex items-center gap-2">
+                    <i class="fa-solid fa-chart-line"></i>
+                    Concentración en Suelo vs Distancia $x$
+                </button>
+                <button id="tab-btn-formula" class="tab-link pb-3 text-slate-400 border-b-2 border-transparent hover:text-slate-200 transition flex items-center gap-2">
+                    <i class="fa-solid fa-square-root-variable"></i>
+                    Ecuación y Teoría Didáctica
+                </button>
+            </div>
+
+            <!-- TAB 1: Gaussian 2D Profiles -->
+            <div id="tab-content-profiles" class="tab-content grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Y-Profile Chart Card -->
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <h3 class="text-xs font-bold text-slate-300 mb-2 flex justify-between items-center">
+                        <span>Perfil Transversal $C(y)$ a $x = \text{constante}$</span>
+                        <span class="text-blue-400 font-mono" id="label-sigmay-val">$\sigma_y = 36.4\text{ m}$</span>
+                    </h3>
+                    <div class="h-56 relative">
+                        <canvas id="chart-y-profile"></canvas>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-2 text-center">
+                        Campana de Gauss horizontal centrada en el eje del viento ($y=0$). Se visualizan las bandas $\pm 1\sigma_y, \pm 2\sigma_y$.
+                    </p>
+                </div>
+
+                <!-- Z-Profile Chart Card -->
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <h3 class="text-xs font-bold text-slate-300 mb-2 flex justify-between items-center">
+                        <span>Perfil Vertical $C(z)$ (Pluma Directa + Reflexión)</span>
+                        <span class="text-purple-400 font-mono" id="label-sigmaz-val">$\sigma_z = 18.2\text{ m}$</span>
+                    </h3>
+                    <div class="h-56 relative">
+                        <canvas id="chart-z-profile"></canvas>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-2 text-center">
+                        Suma del término directo (centro en $z=H$) y el término fantasma o espejo que simula el rebote en el suelo ($z=0$).
+                    </p>
+                </div>
+            </div>
+
+            <!-- TAB 2: Ground Concentration Downwind Profile -->
+            <div id="tab-content-ground" class="tab-content hidden space-y-4">
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-3 gap-2">
+                        <h3 class="text-xs font-bold text-slate-300">
+                            Perfil de Concentración a Nivel de Suelo y Eje Central: $C(x, y=0, z=0)$
+                        </h3>
+                        <div id="cmax-summary-badge" class="px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-300 text-xs font-mono">
+                            Concentración Máxima $C_{max}$: -- $\mu g/m^3$ a $x_{max} = $ -- m
+                        </div>
+                    </div>
+                    <div class="h-64 relative">
+                        <canvas id="chart-ground-profile"></canvas>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-3">
+                        <strong>Interpretación Didáctica:</strong> Cerca de la chimenea ($x \to 0$), la concentración en el suelo es casi nula porque la pluma aún viaja en altura. Conforme avanza hacia sotavento, la pluma se ensancha verticalmente ($\sigma_z$) hasta impactar el suelo, alcanzando un valor máximo $C_{max}$ a una distancia $x_{max}$ (donde aproximadamente $\sigma_z \approx 0.707 H$). Posteriormente, la concentración disminuye por dilución progresiva.
+                    </p>
+                </div>
+            </div>
+
+            <!-- TAB 3: Mathematical Breakdown & Educational Theory -->
+            <div id="tab-content-formula" class="tab-content hidden space-y-6">
+                <!-- Formula Render Box -->
+                <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 text-center overflow-x-auto">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Ecuación General de Dispersión Gaussiana (Con Reflexión Terrestre Total)</h3>
+                    <div id="math-equation-main" class="text-lg md:text-xl py-2 text-blue-200"></div>
+                </div>
+
+                <!-- Term Breakdown Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    <div class="bg-slate-950/70 p-4 rounded-xl border border-slate-800 space-y-2">
+                        <div class="font-bold text-blue-400 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                            1. Término de Dilución Masiva
+                        </div>
+                        <div id="math-term-1" class="py-1 text-center font-mono text-sm text-slate-200"></div>
+                        <p class="text-slate-400 text-[11px]">
+                            Representa el volumen de aire que diluye la masa emitida. Es inversamente proporcional a la velocidad del viento ($u$) y al área transversal de la pluma ($\sigma_y \times \sigma_z$).
+                        </p>
+                    </div>
+
+                    <div class="bg-slate-950/70 p-4 rounded-xl border border-slate-800 space-y-2">
+                        <div class="font-bold text-purple-400 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+                            2. Dispersión Transversal ($Y$)
+                        </div>
+                        <div id="math-term-2" class="py-1 text-center font-mono text-sm text-slate-200"></div>
+                        <p class="text-slate-400 text-[11px]">
+                            Modela la distribución normal o acampanada de los contaminantes a los lados del eje del viento. Si $y = 0$ (eje central), este factor se convierte en 1.
+                        </p>
+                    </div>
+
+                    <div class="bg-slate-950/70 p-4 rounded-xl border border-slate-800 space-y-2">
+                        <div class="font-bold text-emerald-400 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                            3. Dispersión Vertical y Rebote ($Z$)
+                        </div>
+                        <div id="math-term-3" class="py-1 text-center font-mono text-sm text-slate-200"></div>
+                        <p class="text-slate-400 text-[11px]">
+                            Contiene dos exponenciales: la primera calcula la difusión desde la altura efectiva $H$, y la segunda simula el "reflejo" en el suelo invirtiendo la altura (método de imágenes).
+                        </p>
                     </div>
                 </div>
 
+                <!-- Special Case Proofs -->
+                <div class="bg-slate-950/50 p-4 rounded-xl border border-slate-800 text-xs space-y-3">
+                    <h4 class="font-bold text-amber-300 uppercase tracking-wide">Demostración de Casos Límite:</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-slate-300">
+                        <div class="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                            <span class="font-semibold text-blue-300 block mb-1">A Nivel del Suelo ($z = 0$):</span>
+                            <p class="text-[11px] text-slate-400 mb-2">Al evaluar $z = 0$, los dos exponenciales verticales son idénticos: $\exp(-(0-H)^2 / 2\sigma_z^2) = \exp(-H^2 / 2\sigma_z^2)$. Se suman produciendo un factor $2$, simplificando la constante $\frac{2}{2\pi} = \frac{1}{\pi}$:</p>
+                            <div id="math-case-ground" class="font-mono text-center text-amber-200 py-1"></div>
+                        </div>
+
+                        <div class="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                            <span class="font-semibold text-purple-300 block mb-1">Línea Central en Suelo ($y = 0, z = 0$):</span>
+                            <p class="text-[11px] text-slate-400 mb-2">Es la ecuación fundamental para estudios de impacto ambiental sobre la población expuesta:</p>
+                            <div id="math-case-centerground" class="font-mono text-center text-emerald-200 py-1"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
+        </section>
 
     </main>
 
     <script>
-        // Global State Object
+        // Global State
         const state = {
-            Q: 100.0,         // Tasa de emisión (g/s)
-            hs: 50.0,         // Altura chimenea (m)
-            Ts: 120.0,        // Temperatura gases (°C)
-            vs: 12.0,         // Velocidad de salida gases (m/s)
-            d: 2.5,           // Diámetro chimenea (m)
-            u: 4.0,           // Velocidad viento (m/s)
-            dir: 270,         // Dirección viento (grados)
-            stability: 'D',   // Pasquill-Gifford stability A-F
-            Ta: 20.0,         // Temp ambiente (°C)
-            rh: 60.0,         // Humedad relativa (%)
-            terrain: 'flat_rural', // Rugosidad
-            xmax: 5000,       // Distancia máxima de análisis (m)
-            
-            // Scenario Comparison Saved State
-            savedScenario: null,
-            isComparing: false
+            Q: 100.0,       // g/s
+            u: 5.0,         // m/s
+            hs: 50.0,       // m
+            dh: 10.0,       // m
+            get H() { return this.hs + this.dh; },
+            x: 500.0,       // m
+            y: 0.0,         // m
+            z: 0.0,         // m
+            stability: 'D', // A-F
+            showEnvelope: true,
+            showParticles: true,
+            showReflection: false
         };
 
-        // Pasquill-Gifford dispersion parameters coefficients (Briggs / Martin formulas for rural/urban)
-        // sig_y = a * x^b, sig_z = c * x^d + f
-        const stabilityParams = {
-            'A': { a: 0.22, b: 0.91, c: 0.20, d: 1.0, f: 0.0 },
-            'B': { a: 0.16, b: 0.91, c: 0.12, d: 0.91, f: 0.0 },
-            'C': { a: 0.11, b: 0.91, c: 0.08, d: 0.92, f: 0.0 },
-            'D': { a: 0.08, b: 0.91, c: 0.06, d: 0.92, f: 0.0 },
-            'E': { a: 0.06, b: 0.91, c: 0.03, d: 0.92, f: 0.0 },
-            'F': { a: 0.04, b: 0.91, c: 0.016, d: 0.92, f: 0.0 }
-        };
+        // Pasquill-Gifford Dispersion Parameter Formulas (Briggs Rural Equations)
+        function getSigmas(x, stability) {
+            const xM = Math.max(x, 10.0); // Clamp min distance to avoid division by zero
+            let sigY = 0, sigZ = 0;
 
-        let chartInstance = null;
-        let threeScene, threeCamera, threeRenderer, threeControls;
-        let plumeParticlesMesh, chimneyMesh, stackRimLight, groundPlaneMesh, groundTextureCanvas, groundTextureCtx;
-        let plumeParticleData = [];
-        let canvas2DCtx = null;
-        let animationTime = 0;
-
-        // Calculate Plume Rise Delta H using Holland / Briggs simplified formulation
-        function calculatePlumeRise(st) {
-            const Ts_K = st.Ts + 273.15;
-            const Ta_K = st.Ta + 273.15;
-            const deltaT = Math.max(0, Ts_K - Ta_K);
-            const u = Math.max(0.5, st.u);
-            
-            // Buoyancy flux parameter F
-            const g = 9.81;
-            const F = g * st.vs * Math.pow(st.d / 2, 2) * (deltaT / Ts_K);
-
-            let deltaH = 0;
-            if (F > 0) {
-                deltaH = (st.vs * st.d / u) * (1.5 + 2.68e-3 * 1013 * st.d * (deltaT / Ts_K));
-            } else {
-                deltaH = 1.5 * (st.vs * st.d / u);
+            switch(stability) {
+                case 'A':
+                    sigY = 0.22 * xM * Math.pow(1 + 0.0001 * xM, -0.5);
+                    sigZ = 0.20 * xM;
+                    break;
+                case 'B':
+                    sigY = 0.16 * xM * Math.pow(1 + 0.0001 * xM, -0.5);
+                    sigZ = 0.12 * xM;
+                    break;
+                case 'C':
+                    sigY = 0.11 * xM * Math.pow(1 + 0.0001 * xM, -0.5);
+                    sigZ = 0.08 * xM * Math.pow(1 + 0.0002 * xM, -0.5);
+                    break;
+                case 'D':
+                    sigY = 0.08 * xM * Math.pow(1 + 0.0001 * xM, -0.5);
+                    sigZ = 0.06 * xM * Math.pow(1 + 0.0015 * xM, -0.5);
+                    break;
+                case 'E':
+                    sigY = 0.06 * xM * Math.pow(1 + 0.0001 * xM, -0.5);
+                    sigZ = 0.03 * xM * Math.pow(1 + 0.0003 * xM, -1.0);
+                    break;
+                case 'F':
+                    sigY = 0.04 * xM * Math.pow(1 + 0.0001 * xM, -0.5);
+                    sigZ = 0.016 * xM * Math.pow(1 + 0.0003 * xM, -1.0);
+                    break;
             }
-
-            if (st.terrain === 'urban') deltaH *= 0.9;
-            if (st.terrain === 'complex') deltaH *= 0.85;
-
-            return Math.max(2.0, deltaH);
+            return { sigY, sigZ };
         }
 
-        // Calculate Sigma Y and Sigma Z
-        function getSigmas(x, stabilityClass, terrain) {
-            const p = stabilityParams[stabilityClass] || stabilityParams['D'];
-            const x_km = Math.max(x, 10.0) / 1000.0;
-            
-            let sig_y = p.a * 1000 * Math.pow(x_km, p.b);
-            let sig_z = p.c * 1000 * Math.pow(x_km, p.d) + p.f;
+        // Gaussian Plume Core Calculation Function
+        function calculateConcentration(Q, u, x, y, z, H, stability) {
+            if (x <= 0) return { C_ug_m3: 0, sigY: 0.1, sigZ: 0.1 };
+            const { sigY, sigZ } = getSigmas(x, stability);
 
-            // Terrain roughness factor
-            if (terrain === 'urban') {
-                sig_z *= 1.3;
-                sig_y *= 1.2;
-            } else if (terrain === 'complex') {
-                sig_z *= 1.5;
+            const coef = Q / (2 * Math.PI * u * sigY * sigZ);
+            const expY = Math.exp(- (y * y) / (2 * sigY * sigY));
+
+            // Direct plume from source H
+            const expZ1 = Math.exp(- Math.pow(z - H, 2) / (2 * sigZ * sigZ));
+            // Virtual image source from -H (Ground reflection)
+            const expZ2 = Math.exp(- Math.pow(z + H, 2) / (2 * sigZ * sigZ));
+
+            const C_g_m3 = coef * expY * (expZ1 + expZ2);
+            const C_ug_m3 = C_g_m3 * 1e6; // Convert to micrograms per cubic meter
+
+            return {
+                C_g_m3,
+                C_ug_m3,
+                sigY,
+                sigZ,
+                expY,
+                expZ1,
+                expZ2,
+                coef
+            };
+        }
+
+        // Calculate Ground Maximum Concentration Point Numerically
+        function findCMaxGround() {
+            let maxC = -1;
+            let maxX = 100;
+
+            for (let testX = 50; testX <= 5000; testX += 10) {
+                const res = calculateConcentration(state.Q, state.u, testX, 0, 0, state.H, state.stability);
+                if (res.C_ug_m3 > maxC) {
+                    maxC = res.C_ug_m3;
+                    maxX = testX;
+                }
             }
-
-            return { sig_y: Math.max(1.0, sig_y), sig_z: Math.max(1.0, sig_z) };
+            return { xMax: maxX, cMax: maxC };
         }
 
-        // Calculate Ground Level Centerline Concentration C(x, 0, 0) in ug/m3
-        function calculateGroundConcentration(x, st) {
-            if (x <= 1) return 0;
-            const u = Math.max(0.5, st.u);
-            const deltaH = calculatePlumeRise(st);
-            const H = st.hs + deltaH;
-            const { sig_y, sig_z } = getSigmas(x, st.stability, st.terrain);
+        // Three.js 3D Setup
+        let scene, camera, renderer, controls;
+        let stackMesh, virtualStackMesh, plumeGroup, particleSystem, probeMarker, sliceEllipses = [];
+        let particlesData = [];
 
-            // Gaussian Ground-level Centerline Formula:
-            // C(x,0,0) = [ Q / (pi * u * sig_y * sig_z) ] * exp( - H^2 / (2 * sig_z^2) )
-            const factor = st.Q / (Math.PI * u * sig_y * sig_z);
-            const exponent = - Math.pow(H, 2) / (2 * Math.pow(sig_z, 2));
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0f1d);
+            scene.fog = new THREE.FogExp2(0x0a0f1d, 0.0003);
+
+            camera = new THREE.PerspectiveCamera(45, width / height, 1, 8000);
+            camera.position.set(-300, 200, 400);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.01; // Prevent going under ground
+            controls.target.set(300, 50, 0);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(200, 500, 300);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            // Ground Grid
+            const gridHelper = new THREE.GridHelper(4000, 80, 0x3b82f6, 0x1e293b);
+            gridHelper.position.set(1500, 0, 0);
+            scene.add(gridHelper);
+
+            // Ground plane visual
+            const groundGeo = new THREE.PlaneGeometry(5000, 2000);
+            const groundMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.9, metalness: 0.1 });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.set(1500, -0.1, 0);
+            scene.add(ground);
+
+            // Axis Lines (X: Wind Direction, Y: Crosswind, Z: Height)
+            const axisHelper = new THREE.AxesHelper(150);
+            scene.add(axisHelper);
+
+            // Create Smokestack
+            createStack();
+
+            // Create Plume Wireframes / Envelopes
+            plumeGroup = new THREE.Group();
+            scene.add(plumeGroup);
+
+            // Create Particle Cloud
+            initParticles();
+
+            // Create Interactive Sampling Probe Marker
+            const probeGeo = new THREE.SphereGeometry(6, 16, 16);
+            const probeMat = new THREE.MeshBasicMaterial({ color: 0x10b981, wireframe: false });
+            probeMarker = new THREE.Mesh(probeGeo, probeMat);
             
-            const conc_g_m3 = factor * Math.exp(exponent); // g/m3
-            const conc_ug_m3 = conc_g_m3 * 1e6; // ug/m3
+            // Add pulse ring to probe
+            const ringGeo = new THREE.RingGeometry(8, 10, 32);
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0x34d399, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
+            const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+            ringMesh.rotation.x = Math.PI / 2;
+            probeMarker.add(ringMesh);
+            scene.add(probeMarker);
 
-            return Math.max(0, conc_ug_m3);
-        }
-
-        // Calculate Vertical Profile Concentration C(x, 0, z)
-        function calculateVerticalConcentration(x, z, st) {
-            if (x <= 1) return 0;
-            const u = Math.max(0.5, st.u);
-            const deltaH = calculatePlumeRise(st);
-            const H = st.hs + deltaH;
-            const { sig_y, sig_z } = getSigmas(x, st.stability, st.terrain);
-
-            const factor = st.Q / (2 * Math.PI * u * sig_y * sig_z);
-            const expZ1 = Math.exp(-Math.pow(z - H, 2) / (2 * Math.pow(sig_z, 2)));
-            const expZ2 = Math.exp(-Math.pow(z + H, 2) / (2 * Math.pow(sig_z, 2)));
-
-            return factor * (expZ1 + expZ2) * 1e6;
-        }
-
-        window.addEventListener('DOMContentLoaded', () => {
-            initChart();
-            init3DScene();
-            init2DCanvas();
-            updateSimulation();
-
+            // Window resize handler
             window.addEventListener('resize', onWindowResize);
-        });
 
-        // Tab Switching Logic
-        function switchMainTab(tabName) {
-            document.getElementById('tab-sim-content').classList.add('hidden');
-            document.getElementById('tab-theory-content').classList.add('hidden');
-            document.getElementById('tab-pedagogy-content').classList.add('hidden');
+            // Start animation loop
+            animate();
+        }
 
-            document.getElementById('nav-sim').classList.remove('active');
-            document.getElementById('nav-theory').classList.remove('active');
-            document.getElementById('nav-pedagogy').classList.remove('active');
+        function createStack() {
+            if (stackMesh) scene.remove(stackMesh);
+            if (virtualStackMesh) scene.remove(virtualStackMesh);
 
-            if (tabName === 'sim') {
-                document.getElementById('tab-sim-content').classList.remove('hidden');
-                document.getElementById('nav-sim').classList.add('active');
-                if (threeRenderer) onWindowResize();
-            } else if (tabName === 'theory') {
-                document.getElementById('tab-theory-content').classList.remove('hidden');
-                document.getElementById('nav-theory').classList.add('active');
-            } else if (tabName === 'pedagogy') {
-                document.getElementById('tab-pedagogy-content').classList.remove('hidden');
-                document.getElementById('nav-pedagogy').classList.add('active');
+            const stackGroup = new THREE.Group();
+
+            // Physical Stack Cylinder
+            const radius = 6;
+            const geo = new THREE.CylinderGeometry(radius * 0.7, radius, state.hs, 16);
+            const mat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.4 });
+            const cylinder = new THREE.Mesh(geo, mat);
+            cylinder.position.y = state.hs / 2;
+            stackGroup.add(cylinder);
+
+            // Red-White Warning Stripes on top
+            const stripeGeo = new THREE.CylinderGeometry(radius * 0.71, radius * 0.75, state.hs * 0.2, 16);
+            const stripeMat = new THREE.MeshStandardMaterial({ color: 0xef4444 });
+            const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+            stripe.position.y = state.hs * 0.9;
+            stackGroup.add(stripe);
+
+            // Plume rise dotted indicator line ($\Delta h$)
+            const points = [];
+            points.push(new THREE.Vector3(0, state.hs, 0));
+            points.push(new THREE.Vector3(0, state.H, 0));
+            const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+            const lineMat = new THREE.LineDashedMaterial({ color: 0x3b82f6, dashSize: 4, gapSize: 2 });
+            const dhLine = new THREE.Line(lineGeo, lineMat);
+            dhLine.computeLineDistances();
+            stackGroup.add(dhLine);
+
+            // Effective Height Marker Sphere
+            const sphereGeo = new THREE.SphereGeometry(3, 12, 12);
+            const sphereMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6 });
+            const effSphere = new THREE.Mesh(sphereGeo, sphereMat);
+            effSphere.position.set(0, state.H, 0);
+            stackGroup.add(effSphere);
+
+            stackMesh = stackGroup;
+            scene.add(stackMesh);
+
+            // Virtual Mirror Source (Ground Reflection Method of Images)
+            if (state.showReflection) {
+                const mirrorGroup = new THREE.Group();
+                const mirrorCylinder = cylinder.clone();
+                mirrorCylinder.material = new THREE.MeshBasicMaterial({ color: 0xf59e0b, wireframe: true, transparent: true, opacity: 0.3 });
+                mirrorCylinder.position.y = -state.hs / 2;
+                mirrorGroup.add(mirrorCylinder);
+
+                virtualStackMesh = mirrorGroup;
+                scene.add(virtualStackMesh);
             }
         }
 
-        function readInputs() {
-            state.Q = parseFloat(document.getElementById('input-Q').value);
-            state.hs = parseFloat(document.getElementById('input-hs').value);
-            state.Ts = parseFloat(document.getElementById('input-Ts').value);
-            state.vs = parseFloat(document.getElementById('input-vs').value);
-            state.d = parseFloat(document.getElementById('input-d').value);
-            state.u = parseFloat(document.getElementById('input-u').value);
-            state.dir = parseFloat(document.getElementById('input-dir').value);
-            state.stability = document.getElementById('input-stability').value;
-            state.Ta = parseFloat(document.getElementById('input-Ta').value);
-            state.rh = parseFloat(document.getElementById('input-rh').value);
-            state.terrain = document.getElementById('input-terrain').value;
-            state.xmax = parseFloat(document.getElementById('input-xmax').value);
+        function updatePlumeMesh() {
+            // Clear existing plume geometries
+            while (plumeGroup.children.length > 0) {
+                const child = plumeGroup.children.pop();
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+            }
 
-            // Update Labels
-            document.getElementById('val-Q').innerText = state.Q.toFixed(1) + ' g/s';
-            document.getElementById('val-hs').innerText = state.hs.toFixed(0) + ' m';
-            document.getElementById('val-Ts').innerText = state.Ts.toFixed(0) + ' °C';
-            document.getElementById('val-vs').innerText = state.vs.toFixed(1) + ' m/s';
-            document.getElementById('val-d').innerText = state.d.toFixed(1) + ' m';
-            document.getElementById('val-u').innerText = state.u.toFixed(1) + ' m/s';
-            document.getElementById('val-dir').innerText = state.dir + '°';
-            document.getElementById('val-Ta').innerText = state.Ta.toFixed(0) + ' °C';
-            document.getElementById('val-rh').innerText = state.rh.toFixed(0) + ' %';
-            document.getElementById('val-xmax').innerText = state.xmax.toFixed(0) + ' m';
-        }
+            if (!state.showEnvelope) return;
 
-        // Master Simulation Refresh Function
-        function updateSimulation() {
-            readInputs();
+            // Generate Gaussian Cone Envelopes ($1\sigma, 2\sigma$)
+            const slicesCount = 40;
+            const maxDistance = 2500;
+            const step = maxDistance / slicesCount;
 
-            // Compute Key Metrics
-            const deltaH = calculatePlumeRise(state);
-            const H = state.hs + deltaH;
+            const geo1Sig = new THREE.BufferGeometry();
+            const geo2Sig = new THREE.BufferGeometry();
 
-            // Find C_max and x_max by sampling along x
-            let cMax = 0;
-            let xMax = 0;
-            const step = state.xmax / 200;
-            for (let x = 10; x <= state.xmax; x += step) {
-                const c = calculateGroundConcentration(x, state);
-                if (c > cMax) {
-                    cMax = c;
-                    xMax = x;
+            const vertices1Sig = [];
+            const vertices2Sig = [];
+
+            for (let i = 1; i <= slicesCount; i++) {
+                const xVal = i * step;
+                const { sigY, sigZ } = getSigmas(xVal, state.stability);
+
+                // Sample cross section ellipse points
+                const segments = 24;
+                for (let j = 0; j <= segments; j++) {
+                    const angle = (j / segments) * Math.PI * 2;
+                    
+                    // 1-Sigma Ellipse
+                    const y1 = Math.cos(angle) * sigY;
+                    const z1 = state.H + Math.sin(angle) * sigZ;
+                    vertices1Sig.push(xVal, z1, y1);
+
+                    // 2-Sigma Ellipse
+                    const y2 = Math.cos(angle) * (2 * sigY);
+                    const z2 = state.H + Math.sin(angle) * (2 * sigZ);
+                    vertices2Sig.push(xVal, z2, y2);
                 }
             }
 
-            // Update UI KPIs
-            document.getElementById('kpi-cmax').innerText = cMax.toFixed(2);
-            document.getElementById('kpi-xmax').innerText = Math.round(xMax);
-            document.getElementById('kpi-deltah').innerText = deltaH.toFixed(1);
-            document.getElementById('kpi-H').innerText = H.toFixed(1);
+            // Create Ring Slices at key distances
+            const keyDistances = [200, 500, 1000, 1800];
+            keyDistances.forEach(dist => {
+                const { sigY, sigZ } = getSigmas(dist, state.stability);
+                
+                // Ellipse curve
+                const curve = new THREE.EllipseCurve(
+                    0, state.H,            // ax, aY
+                    sigY, sigZ,           // xRadius, yRadius
+                    0, 2 * Math.PI,      // aStartAngle, aEndAngle
+                    false, 0             // aClockwise, aRotation
+                );
+                
+                const points = curve.getPoints(32);
+                const ellipseGeo = new THREE.BufferGeometry().setFromPoints(
+                    points.map(p => new THREE.Vector3(dist, p.y, p.x))
+                );
+                const ellipseMat = new THREE.LineBasicMaterial({ color: 0x60a5fa, opacity: 0.6, transparent: true });
+                const ellipseLine = new THREE.LineLoop(ellipseGeo, ellipseMat);
+                plumeGroup.add(ellipseLine);
+            });
 
-            const badge = document.getElementById('kpi-norm-badge');
-            if (cMax > 100) {
-                badge.className = "mt-1 font-bold text-xs px-2 py-0.5 rounded text-center bg-red-500/20 text-red-400 border border-red-500/30";
-                badge.innerText = "EXCEDE NORMA (100 µg/m³)";
-            } else {
-                badge.className = "mt-1 font-bold text-xs px-2 py-0.5 rounded text-center bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
-                badge.innerText = "DENTRO DE NORMA";
-            }
-
-            // Update Charts and Renderers
-            updateChartData(xMax, cMax);
-            update2DCanvas(H);
-            update3DScene(H);
-            updateAutomatedFeedback(cMax, xMax, deltaH, H);
+            // Create Particle Flow Cloud Visualization
+            updateParticles();
         }
 
-        function initChart() {
-            const ctx = document.getElementById('chart-concentration').getContext('2d');
-            chartInstance = new Chart(ctx, {
+        function initParticles() {
+            const count = 1200;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+
+            particlesData = [];
+
+            for (let i = 0; i < count; i++) {
+                // Random position along downwind distance X
+                const x = Math.random() * 2200;
+                const { sigY, sigZ } = getSigmas(x, state.stability);
+
+                // Gaussian random offsets
+                const u1 = Math.random();
+                const u2 = Math.random();
+                const randY = Math.sqrt(-2.0 * Math.log(u1 || 0.001)) * Math.cos(2.0 * Math.PI * u2);
+                const randZ = Math.sqrt(-2.0 * Math.log(u1 || 0.001)) * Math.sin(2.0 * Math.PI * u2);
+
+                const y = randY * sigY;
+                let z = state.H + randZ * sigZ;
+
+                // Handle ground reflection physically
+                if (z < 0) z = Math.abs(z);
+
+                positions[i * 3] = x;
+                positions[i * 3 + 1] = z;
+                positions[i * 3 + 2] = y;
+
+                colors[i * 3] = 0.2;
+                colors[i * 3 + 1] = 0.6;
+                colors[i * 3 + 2] = 1.0;
+
+                particlesData.push({
+                    x, randY, randZ, speed: 20 + Math.random() * 30
+                });
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const material = new THREE.PointsMaterial({
+                size: 4,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.7,
+                blending: THREE.AdditiveBlending
+            });
+
+            particleSystem = new THREE.Points(geometry, material);
+            scene.add(particleSystem);
+        }
+
+        function updateParticles() {
+            if (!particleSystem) return;
+            particleSystem.visible = state.showParticles;
+            
+            const positions = particleSystem.geometry.attributes.position.array;
+            const count = particlesData.length;
+
+            for (let i = 0; i < count; i++) {
+                const p = particlesData[i];
+                p.x += p.speed * (state.u / 5.0) * 0.2;
+                if (p.x > 2400) p.x = 10; // Recycle particle
+
+                const { sigY, sigZ } = getSigmas(p.x, state.stability);
+                const y = p.randY * sigY;
+                let z = state.H + p.randZ * sigZ;
+                if (z < 0) z = Math.abs(z); // Reflect
+
+                positions[i * 3] = p.x;
+                positions[i * 3 + 1] = z;
+                positions[i * 3 + 2] = y;
+            }
+
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas-container');
+            if (!container) return;
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            // Animate particles
+            if (state.showParticles) {
+                updateParticles();
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // 2D Chart.js Initialization
+        let chartYProfile, chartZProfile, chartGroundProfile;
+
+        function initCharts() {
+            // Chart 1: Y-Profile C(y)
+            const ctxY = document.getElementById('chart-y-profile').getContext('2d');
+            chartYProfile = new Chart(ctxY, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Concentración C(y) [μg/m³]',
+                        data: [],
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { title: { display: true, text: 'Distancia Transversal y (m)', color: '#94a3b8', font: { size: 10 } }, grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { size: 10 } } },
+                        y: { title: { display: true, text: 'C (μg/m³)', color: '#94a3b8', font: { size: 10 } }, grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { size: 10 } } }
+                    }
+                }
+            });
+
+            // Chart 2: Z-Profile C(z)
+            const ctxZ = document.getElementById('chart-z-profile').getContext('2d');
+            chartZProfile = new Chart(ctxZ, {
                 type: 'line',
                 data: {
                     labels: [],
                     datasets: [
                         {
-                            label: 'Escenario Actual',
+                            label: 'Concentración Total C(z)',
                             data: [],
-                            borderColor: '#38bdf8',
-                            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                            borderColor: '#a855f7',
+                            backgroundColor: 'rgba(168, 85, 247, 0.15)',
                             fill: true,
+                            tension: 0.4,
                             borderWidth: 2,
-                            pointRadius: 0,
-                            tension: 0.3
-                        },
-                        {
-                            label: 'Límite Normativo (100 µg/m³)',
-                            data: [],
-                            borderColor: '#ef4444',
-                            borderDash: [6, 6],
-                            borderWidth: 1.5,
-                            pointRadius: 0,
-                            fill: false
+                            pointRadius: 0
                         }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    animation: { duration: 150 },
-                    plugins: {
-                        legend: { labels: { color: '#94a3b8', font: { size: 10 } } },
-                        tooltip: {
-                            callbacks: {
-                                label: (ctx) => `${ctx.dataset.label}: ${ctx.raw.toFixed(2)} µg/m³`
-                            }
-                        }
-                    },
+                    indexAxis: 'y', // Vertical profile plot
+                    plugins: { legend: { display: false } },
                     scales: {
-                        x: {
-                            title: { display: true, text: 'Distancia Sotavento (x) [m]', color: '#64748b', font: { size: 10 } },
-                            ticks: { color: '#64748b', font: { size: 9 } },
-                            grid: { color: '#1e293b' }
+                        x: { title: { display: true, text: 'C (μg/m³)', color: '#94a3b8', font: { size: 10 } }, grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { size: 10 } } },
+                        y: { title: { display: true, text: 'Altura z (m)', color: '#94a3b8', font: { size: 10 } }, grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { size: 10 } } }
+                    }
+                }
+            });
+
+            // Chart 3: Ground Centerline C(x, 0, 0)
+            const ctxGround = document.getElementById('chart-ground-profile').getContext('2d');
+            chartGroundProfile = new Chart(ctxGround, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'C(x, 0, 0) en Suelo',
+                            data: [],
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                            fill: true,
+                            tension: 0.3,
+                            borderWidth: 2,
+                            pointRadius: 0
                         },
-                        y: {
-                            title: { display: true, text: 'Concentración Superficial (C) [µg/m³]', color: '#64748b', font: { size: 10 } },
-                            ticks: { color: '#64748b', font: { size: 9 } },
-                            grid: { color: '#1e293b' },
-                            beginAtZero: true
+                        {
+                            label: 'Punto Muestral x',
+                            data: [],
+                            borderColor: '#10b981',
+                            backgroundColor: '#10b981',
+                            pointRadius: 6,
+                            showLine: false
                         }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { title: { display: true, text: 'Distancia Sotavento x (m)', color: '#94a3b8', font: { size: 10 } }, grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { size: 10 } } },
+                        y: { title: { display: true, text: 'Concentración (μg/m³)', color: '#94a3b8', font: { size: 10 } }, grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { size: 10 } } }
                     }
                 }
             });
         }
 
-        function updateChartData(xMax, cMax) {
-            if (!chartInstance) return;
+        function updateSimulation() {
+            // Recalculate C at current sample point (x,y,z)
+            const currentEval = calculateConcentration(state.Q, state.u, state.x, state.y, state.z, state.H, state.stability);
+            const { xMax, cMax } = findCMaxGround();
 
-            const points = 100;
-            const labels = [];
-            const dataCurrent = [];
-            const dataNorm = [];
-            const step = state.xmax / points;
+            // Update Header & UI Badges
+            document.getElementById('header-H').textContent = `${state.H.toFixed(1)} m`;
+            document.getElementById('header-C').textContent = `${currentEval.C_ug_m3.toFixed(2)} μg/m³`;
+            document.getElementById('header-Xmax').textContent = `${xMax} m (${cMax.toFixed(1)} μg/m³)`;
 
-            for (let i = 0; i <= points; i++) {
-                const x = i * step;
-                labels.push(Math.round(x));
-                dataCurrent.push(calculateGroundConcentration(x, state));
-                dataNorm.push(100.0);
+            document.getElementById('val-disp-x').textContent = `${state.x} m`;
+            document.getElementById('val-disp-y').textContent = `${state.y} m`;
+            document.getElementById('val-disp-z').textContent = `${state.z} m`;
+            document.getElementById('val-disp-sigmas').innerHTML = `$\\sigma_y$: <b>${currentEval.sigY.toFixed(1)}m</b> | $\\sigma_z$: <b>${currentEval.sigZ.toFixed(1)}m</b>`;
+            if (window.renderMathInElement) window.renderMathInElement(document.getElementById('val-disp-sigmas'));
+
+            document.getElementById('label-sigmay-val').textContent = `σy = ${currentEval.sigY.toFixed(1)} m`;
+            document.getElementById('label-sigmaz-val').textContent = `σz = ${currentEval.sigZ.toFixed(1)} m`;
+
+            document.getElementById('cmax-summary-badge').innerHTML = `Concentración Máxima $C_{max}$: <b>${cMax.toFixed(2)} $\\mu g/m^3$</b> a $x_{max} = $ <b>${xMax} m</b>`;
+
+            // Update 3D Probe Marker Position
+            if (probeMarker) {
+                probeMarker.position.set(state.x, state.z, state.y);
             }
 
-            chartInstance.data.labels = labels;
-            chartInstance.data.datasets[0].data = dataCurrent;
-            chartInstance.data.datasets[1].data = dataNorm;
+            // Update Stack 3D Mesh
+            createStack();
+            updatePlumeMesh();
 
-            // Scenario Comparison Dataset overlay
-            if (state.isComparing && state.savedScenario) {
-                const dataComp = labels.map(x => calculateGroundConcentration(x, state.savedScenario));
-                if (chartInstance.data.datasets.length < 3) {
-                    chartInstance.data.datasets.push({
-                        label: 'Escenario A (Guardado)',
-                        data: dataComp,
-                        borderColor: '#a855f7',
-                        borderDash: [3, 3],
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        fill: false
-                    });
+            // Update Charts
+            updateChartsData(currentEval, xMax);
+
+            // Update Math KaTeX Formulas
+            renderMathFormulas();
+        }
+
+        function updateChartsData(currentEval, xMax) {
+            // 1. Y Profile Data: C(y) at current x and z
+            const yLabels = [];
+            const yData = [];
+            const rangeY = Math.max(3 * currentEval.sigY, 100);
+            const stepY = rangeY / 30;
+
+            for (let yVal = -rangeY; yVal <= rangeY; yVal += stepY) {
+                yLabels.push(yVal.toFixed(0));
+                const res = calculateConcentration(state.Q, state.u, state.x, yVal, state.z, state.H, state.stability);
+                yData.push(res.C_ug_m3);
+            }
+
+            chartYProfile.data.labels = yLabels;
+            chartYProfile.data.datasets[0].data = yData;
+            chartYProfile.update('none');
+
+            // 2. Z Profile Data: C(z) at current x and y
+            const zLabels = [];
+            const zData = [];
+            const maxZ = Math.max(state.H * 2.2, 150);
+            const stepZ = maxZ / 30;
+
+            for (let zVal = 0; zVal <= maxZ; zVal += stepZ) {
+                zLabels.push(zVal.toFixed(0));
+                const res = calculateConcentration(state.Q, state.u, state.x, state.y, zVal, state.H, state.stability);
+                zData.push(res.C_ug_m3);
+            }
+
+            chartZProfile.data.labels = zLabels;
+            chartZProfile.data.datasets[0].data = zData;
+            chartZProfile.update('none');
+
+            // 3. Ground Profile Data: C(x, 0, 0) vs x
+            const xLabels = [];
+            const xData = [];
+            const samplePointData = [];
+
+            for (let xVal = 50; xVal <= 3000; xVal += 50) {
+                xLabels.push(xVal);
+                const res = calculateConcentration(state.Q, state.u, xVal, 0, 0, state.H, state.stability);
+                xData.push(res.C_ug_m3);
+
+                if (Math.abs(xVal - state.x) < 25) {
+                    samplePointData.push({ x: xVal, y: res.C_ug_m3 });
                 } else {
-                    chartInstance.data.datasets[2].data = dataComp;
-                }
-            } else if (!state.isComparing && chartInstance.data.datasets.length > 2) {
-                chartInstance.data.datasets.pop();
-            }
-
-            chartInstance.update();
-        }
-
-        function init2DCanvas() {
-            const canvas = document.getElementById('canvas2d');
-            canvas2DCtx = canvas.getContext('2d');
-        }
-
-        function update2DCanvas(H) {
-            const canvas = document.getElementById('canvas2d');
-            if (!canvas2DCtx) return;
-
-            // Canvas resolution adjustment
-            const parent = canvas.parentElement;
-            canvas.width = parent.clientWidth || 600;
-            canvas.height = parent.clientHeight || 350;
-
-            const w = canvas.width;
-            const h = canvas.height;
-            const ctx = canvas2DCtx;
-
-            ctx.clearRect(0, 0, w, h);
-
-            // Dark background
-            ctx.fillStyle = '#070b14';
-            ctx.fillRect(0, 0, w, h);
-
-            // Margins for axes
-            const marginLeft = 55;
-            const marginBottom = 40;
-            const marginTop = 35;
-            const marginRight = 120;
-
-            const plotW = w - marginLeft - marginRight;
-            const plotH = h - marginTop - marginBottom;
-
-            const maxZ = Math.max(150, H * 2.2);
-            const maxX = state.xmax;
-
-            const scaleX = plotW / maxX;
-            const scaleZ = plotH / maxZ;
-
-            const groundY = marginTop + plotH;
-            const chimneyX = marginLeft;
-
-            // Render high-contrast concentration field grid
-            const gridCols = 120;
-            const gridRows = 60;
-            const cellW = plotW / gridCols;
-            const cellH = plotH / gridRows;
-
-            for (let c = 0; c < gridCols; c++) {
-                const xReal = (c + 0.5) * (maxX / gridCols);
-                if (xReal < 5) continue;
-
-                for (let r = 0; r < gridRows; r++) {
-                    const zReal = (gridRows - r - 0.5) * (maxZ / gridRows);
-                    const conc = calculateVerticalConcentration(xReal, zReal, state);
-
-                    if (conc > 0.1) {
-                        const cellX = marginLeft + c * cellW;
-                        const cellY = marginTop + r * cellH;
-
-                        // High contrast color map: Blue -> Green -> Yellow -> Red -> Magenta
-                        let colorStr = '';
-                        if (conc < 10) {
-                            const alpha = Math.min(0.8, conc / 10);
-                            colorStr = `rgba(14, 165, 233, ${alpha})`;
-                        } else if (conc < 40) {
-                            const t = (conc - 10) / 30;
-                            colorStr = `rgba(${Math.round(14 + t * 20)}, ${Math.round(165 + t * 32)}, ${Math.round(233 - t * 140)}, 0.85)`;
-                        } else if (conc < 100) {
-                            const t = (conc - 40) / 60;
-                            colorStr = `rgba(${Math.round(34 + t * 200)}, ${Math.round(197 - t * 18)}, ${Math.round(94 - t * 80)}, 0.9)`;
-                        } else if (conc < 250) {
-                            const t = Math.min(1.0, (conc - 100) / 150);
-                            colorStr = `rgba(239, ${Math.round(68 - t * 40)}, ${Math.round(68 - t * 40)}, 0.95)`;
-                        } else {
-                            colorStr = `rgba(217, 70, 239, 0.95)`;
-                        }
-
-                        ctx.fillStyle = colorStr;
-                        ctx.fillRect(cellX, cellY, cellW + 0.5, cellH + 0.5);
-                    }
+                    samplePointData.push(null);
                 }
             }
 
-            // Draw Centerline Plume trajectory H(x)
-            ctx.beginPath();
-            ctx.strokeStyle = '#f59e0b'; // Amber 500
-            ctx.lineWidth = 2;
-            ctx.setLineDash([4, 4]);
+            chartGroundProfile.data.labels = xLabels;
+            chartGroundProfile.data.datasets[0].data = xData;
+            chartGroundProfile.data.datasets[1].data = samplePointData;
+            chartGroundProfile.update('none');
+        }
 
-            for (let px = 0; px <= plotW; px += 4) {
-                const xReal = px / scaleX;
-                const deltaH_curr = calculatePlumeRise(state) * (1 - Math.exp(-xReal / 200));
-                const H_curr = state.hs + deltaH_curr;
-                const canvasY = groundY - (H_curr * scaleZ);
+        function renderMathFormulas() {
+            if (typeof katex === 'undefined') return;
 
-                if (px === 0) ctx.moveTo(marginLeft + px, canvasY);
-                else ctx.lineTo(marginLeft + px, canvasY);
-            }
-            ctx.stroke();
-            ctx.setLineDash([]); // Reset line dash
+            const mainEq = `C(x,y,z) = \\frac{Q}{2\\pi u \\sigma_y \\sigma_z} \\exp\\left(-\\frac{y^2}{2\\sigma_y^2}\\right) \\left[ \\exp\\left(-\\frac{(z-H)^2}{2\\sigma_z^2}\\right) + \\exp\\left(-\\frac{(z+H)^2}{2\\sigma_z^2}\\right) \\right]`;
+            katex.render(mainEq, document.getElementById('math-equation-main'), { displayMode: true, throwOnError: false });
 
-            // Draw Plume Upper and Lower Envelope boundaries (+- 2 sig_z)
-            ctx.beginPath();
-            ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
-            ctx.lineWidth = 1.5;
-            ctx.setLineDash([2, 2]);
+            katex.render(`\\frac{${state.Q}}{2\\pi (${state.u}) \\sigma_y \\sigma_z}`, document.getElementById('math-term-1'), { displayMode: false });
+            katex.render(`\\exp\\left(-\\frac{${state.y}^2}{2\\sigma_y^2}\\right)`, document.getElementById('math-term-2'), { displayMode: false });
+            katex.render(`\\exp\\left(-\\frac{(z-${state.H})^2}{2\\sigma_z^2}\\right) + \\exp\\left(-\\frac{(z+${state.H})^2}{2\\sigma_z^2}\\right)`, document.getElementById('math-term-3'), { displayMode: false });
 
-            // Upper boundary
-            for (let px = 0; px <= plotW; px += 5) {
-                const xReal = px / scaleX;
-                if (xReal < 1) continue;
-                const deltaH_curr = calculatePlumeRise(state) * (1 - Math.exp(-xReal / 200));
-                const H_curr = state.hs + deltaH_curr;
-                const { sig_z } = getSigmas(xReal, state.stability, state.terrain);
-                const zTop = H_curr + 2.0 * sig_z;
-                const canvasY = Math.max(marginTop, groundY - (zTop * scaleZ));
+            katex.render(`C(x,y,0) = \\frac{Q}{\\pi u \\sigma_y \\sigma_z} \\exp\\left(-\\frac{y^2}{2\\sigma_y^2}\\right) \\exp\\left(-\\frac{H^2}{2\\sigma_z^2}\\right)`, document.getElementById('math-case-ground'), { displayMode: true });
+            katex.render(`C(x,0,0) = \\frac{Q}{\\pi u \\sigma_y \\sigma_z} \\exp\\left(-\\frac{H^2}{2\\sigma_z^2}\\right)`, document.getElementById('math-case-centerground'), { displayMode: true });
+        }
 
-                if (px === 0) ctx.moveTo(marginLeft + px, canvasY);
-                else ctx.lineTo(marginLeft + px, canvasY);
-            }
-            ctx.stroke();
-
-            // Lower boundary
-            ctx.beginPath();
-            for (let px = 0; px <= plotW; px += 5) {
-                const xReal = px / scaleX;
-                if (xReal < 1) continue;
-                const deltaH_curr = calculatePlumeRise(state) * (1 - Math.exp(-xReal / 200));
-                const H_curr = state.hs + deltaH_curr;
-                const { sig_z } = getSigmas(xReal, state.stability, state.terrain);
-                const zBot = Math.max(0, H_curr - 2.0 * sig_z);
-                const canvasY = groundY - (zBot * scaleZ);
-
-                if (px === 0) ctx.moveTo(marginLeft + px, canvasY);
-                else ctx.lineTo(marginLeft + px, canvasY);
-            }
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // Ground Line
-            ctx.fillStyle = '#1e293b';
-            ctx.fillRect(marginLeft, groundY, plotW, marginBottom);
-            ctx.strokeStyle = '#475569';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(marginLeft, groundY);
-            ctx.lineTo(marginLeft + plotW, groundY);
-            ctx.stroke();
-
-            // Draw Physical Chimney Stack at x = 0
-            const stackHeightCanvas = state.hs * scaleZ;
-            const chimneyTopY = groundY - stackHeightCanvas;
-            const stackW = 12;
-
-            // Stack body
-            const stackGrad = ctx.createLinearGradient(chimneyX - stackW / 2, 0, chimneyX + stackW / 2, 0);
-            stackGrad.addColorStop(0, '#475569');
-            stackGrad.addColorStop(0.5, '#94a3b8');
-            stackGrad.addColorStop(1, '#334155');
-
-            ctx.fillStyle = stackGrad;
-            ctx.fillRect(chimneyX - stackW / 2, chimneyTopY, stackW, stackHeightCanvas);
-            ctx.strokeStyle = '#0f172a';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(chimneyX - stackW / 2, chimneyTopY, stackW, stackHeightCanvas);
-
-            // Stack Top Rim
-            ctx.fillStyle = '#ef4444';
-            ctx.fillRect(chimneyX - (stackW / 2 + 2), chimneyTopY - 3, stackW + 4, 3);
-
-            // Chimney Height Marker Label
-            ctx.fillStyle = '#f8fafc';
-            ctx.font = 'bold 10px monospace';
-            ctx.fillText(`h_s = ${state.hs}m`, chimneyX + 10, chimneyTopY + 12);
-
-            // Effective Height Label H
-            const hEffY = groundY - (H * scaleZ);
-            ctx.fillStyle = '#f59e0b';
-            ctx.fillText(`H = ${H.toFixed(1)}m`, marginLeft + Math.min(plotW - 80, plotW * 0.35), hEffY - 6);
-
-            // Draw Ground Impact Peak Point
-            let cMax = 0, xMax = 0;
-            for (let x = 10; x <= state.xmax; x += state.xmax / 100) {
-                const c = calculateGroundConcentration(x, state);
-                if (c > cMax) { cMax = c; xMax = x; }
-            }
-
-            if (cMax > 0.5) {
-                const maxCanvasX = marginLeft + (xMax * scaleX);
-                ctx.fillStyle = '#ef4444';
-                ctx.beginPath();
-                ctx.arc(maxCanvasX, groundY, 5, 0, Math.PI * 2);
-                ctx.fill();
-
-                // Peak Badge Popup
-                ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-                ctx.strokeStyle = '#ef4444';
-                ctx.lineWidth = 1.5;
-                ctx.fillRect(maxCanvasX - 45, groundY + 8, 90, 22);
-                ctx.strokeRect(maxCanvasX - 45, groundY + 8, 90, 22);
-
-                ctx.fillStyle = '#fca5a5';
-                ctx.font = 'bold 9px monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText(`C_max: ${cMax.toFixed(1)} µg/m³`, maxCanvasX, groundY + 18);
-                ctx.fillText(`@ ${Math.round(xMax)} m`, maxCanvasX, groundY + 27);
-                ctx.textAlign = 'left';
-            }
-
-            // Axis X Ticks & Labels
-            ctx.fillStyle = '#94a3b8';
-            ctx.font = '10px sans-serif';
-            ctx.textAlign = 'center';
-            const numTicksX = 5;
-            for (let i = 0; i <= numTicksX; i++) {
-                const valX = (maxX / numTicksX) * i;
-                const canvasX = marginLeft + (valX * scaleX);
-
-                ctx.strokeStyle = '#334155';
-                ctx.beginPath();
-                ctx.moveTo(canvasX, marginTop);
-                ctx.lineTo(canvasX, groundY + 4);
-                ctx.stroke();
-
-                ctx.fillText(`${Math.round(valX)}m`, canvasX, groundY + 16);
-            }
-            ctx.fillText('Distancia Sotavento (x)', marginLeft + plotW / 2, groundY + 30);
-
-            // Axis Z Ticks & Labels
-            ctx.textAlign = 'right';
-            const numTicksZ = 4;
-            for (let i = 0; i <= numTicksZ; i++) {
-                const valZ = (maxZ / numTicksZ) * i;
-                const canvasY = groundY - (valZ * scaleZ);
-
-                ctx.strokeStyle = '#334155';
-                ctx.beginPath();
-                ctx.moveTo(marginLeft - 4, canvasY);
-                ctx.lineTo(marginLeft + plotW, canvasY);
-                ctx.stroke();
-
-                ctx.fillText(`${Math.round(valZ)}m`, marginLeft - 8, canvasY + 3);
-            }
-
-            // Legend Panel on Top Right of 2D Canvas
-            const legW = 105;
-            const legH = 110;
-            const legX = w - legW - 10;
-            const legY = marginTop;
-
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-            ctx.strokeStyle = '#334155';
-            ctx.lineWidth = 1;
-            ctx.fillRect(legX, legY, legW, legH);
-            ctx.strokeRect(legX, legY, legW, legH);
-
-            ctx.fillStyle = '#f8fafc';
-            ctx.font = 'bold 10px sans-serif';
-            ctx.textAlign = 'left';
-            ctx.fillText('Leyenda (µg/m³)', legX + 8, legY + 14);
-
-            const legendItems = [
-                { color: 'rgba(217, 70, 239, 0.9)', label: '> 250 (Muy Alto)' },
-                { color: 'rgba(239, 68, 68, 0.9)', label: '100 - 250 (Excede)' },
-                { color: 'rgba(234, 179, 8, 0.9)', label: '40 - 100 (Medio)' },
-                { color: 'rgba(34, 197, 94, 0.9)', label: '10 - 40 (Bajo)' },
-                { color: 'rgba(14, 165, 233, 0.8)', label: '< 10 (Mínimo)' }
+        function bindEvents() {
+            // Inputs & Sliders
+            const inputs = [
+                { id: 'input-q', prop: 'Q', valId: 'val-q', format: v => `${parseFloat(v).toFixed(1)} g/s` },
+                { id: 'input-u', prop: 'u', valId: 'val-u', format: v => `${parseFloat(v).toFixed(1)} m/s` },
+                { id: 'input-hs', prop: 'hs', valId: 'val-hs', format: v => `${parseInt(v)} m` },
+                { id: 'input-dh', prop: 'dh', valId: 'val-dh', format: v => `${parseInt(v)} m` },
+                { id: 'input-x', prop: 'x', valId: 'val-x', format: v => `${parseInt(v)} m` },
+                { id: 'input-y', prop: 'y', valId: 'val-y', format: v => `${parseInt(v)} m` },
+                { id: 'input-z', prop: 'z', valId: 'val-z', format: v => `${parseInt(v)} m` },
             ];
 
-            legendItems.forEach((item, idx) => {
-                const itemY = legY + 28 + (idx * 15);
-                ctx.fillStyle = item.color;
-                ctx.fillRect(legX + 8, itemY - 8, 12, 10);
-                ctx.strokeStyle = '#000';
-                ctx.strokeRect(legX + 8, itemY - 8, 12, 10);
-
-                ctx.fillStyle = '#cbd5e1';
-                ctx.font = '9px sans-serif';
-                ctx.fillText(item.label, legX + 25, itemY);
-            });
-        }
-
-        function init3DScene() {
-            const container = document.getElementById('threejs-container');
-            const width = container.clientWidth || 400;
-            const height = container.clientHeight || 300;
-
-            threeScene = new THREE.Scene();
-            threeScene.background = new THREE.Color(0x070b14);
-
-            threeCamera = new THREE.PerspectiveCamera(45, width / height, 1, 5000);
-            threeCamera.position.set(-180, 140, 260);
-
-            threeRenderer = new THREE.WebGLRenderer({ antialias: true });
-            threeRenderer.setSize(width, height);
-            threeRenderer.setPixelRatio(window.devicePixelRatio);
-            container.appendChild(threeRenderer.domElement);
-
-            threeControls = new THREE.OrbitControls(threeCamera, threeRenderer.domElement);
-            threeControls.enableDamping = true;
-            threeControls.dampingFactor = 0.05;
-            threeControls.target.set(120, 30, 0);
-
-            // Lighting
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
-            threeScene.add(ambientLight);
-
-            const dirLight = new THREE.DirectionalLight(0x38bdf8, 0.9);
-            dirLight.position.set(100, 300, 150);
-            threeScene.add(dirLight);
-
-            // Ground Grid
-            const gridHelper = new THREE.GridHelper(600, 40, 0x334155, 0x1e293b);
-            gridHelper.position.set(200, -0.1, 0);
-            threeScene.add(gridHelper);
-
-            // Dynamic Ground Plane Texture for Concentration Footprint
-            groundTextureCanvas = document.createElement('canvas');
-            groundTextureCanvas.width = 256;
-            groundTextureCanvas.height = 128;
-            groundTextureCtx = groundTextureCanvas.getContext('2d');
-
-            const groundTexture = new THREE.CanvasTexture(groundTextureCanvas);
-            const groundGeo = new THREE.PlaneGeometry(500, 200);
-            const groundMat = new THREE.MeshBasicMaterial({
-                map: groundTexture,
-                transparent: true,
-                opacity: 0.85,
-                side: THREE.DoubleSide
-            });
-            groundPlaneMesh = new THREE.Mesh(groundGeo, groundMat);
-            groundPlaneMesh.rotation.x = -Math.PI / 2;
-            groundPlaneMesh.position.set(250, 0, 0);
-            threeScene.add(groundPlaneMesh);
-
-            // Chimney Mesh
-            const geom = new THREE.CylinderGeometry(2.5, 3.5, 50, 24);
-            const mat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.4, metalness: 0.3 });
-            chimneyMesh = new THREE.Mesh(geom, mat);
-            chimneyMesh.position.set(0, 25, 0);
-            threeScene.add(chimneyMesh);
-
-            // Red Beacon Light at top rim
-            const rimGeo = new THREE.TorusGeometry(2.6, 0.6, 8, 24);
-            const rimMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
-            stackRimLight = new THREE.Mesh(rimGeo, rimMat);
-            stackRimLight.rotation.x = Math.PI / 2;
-            threeScene.add(stackRimLight);
-
-            // Particle System for Continuous Flowing Plume
-            const particleCount = 2000;
-            const pGeom = new THREE.BufferGeometry();
-            const positions = new Float32Array(particleCount * 3);
-            const colors = new Float32Array(particleCount * 3);
-
-            plumeParticleData = [];
-            for (let i = 0; i < particleCount; i++) {
-                plumeParticleData.push({
-                    distFrac: Math.random(), // 0 to 1 along xmax
-                    randG1: (Math.random() + Math.random() + Math.random() - 1.5) * 1.2,
-                    randG2: (Math.random() + Math.random() + Math.random() - 1.5) * 1.2
+            inputs.forEach(item => {
+                const el = document.getElementById(item.id);
+                el.addEventListener('input', (e) => {
+                    const val = parseFloat(e.target.value);
+                    state[item.prop] = val;
+                    document.getElementById(item.valId).textContent = item.format(val);
+                    updateSimulation();
                 });
-            }
-
-            pGeom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            pGeom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-            const pMat = new THREE.PointsMaterial({
-                size: 5,
-                vertexColors: true,
-                transparent: true,
-                opacity: 0.75,
-                blending: THREE.AdditiveBlending
             });
 
-            plumeParticlesMesh = new THREE.Points(pGeom, pMat);
-            threeScene.add(plumeParticlesMesh);
+            // Atmospheric Stability Buttons
+            const stabDescs = {
+                'A': 'A: Extremadamente Inestable - Días muy soleados con viento suave.',
+                'B': 'B: Moderadamente Inestable - Soleado con viento moderado.',
+                'C': 'C: Ligeramente Inestable - Ligeramente nublado o sol intenso con viento fuerte.',
+                'D': 'D: Neutra - Cielos cubiertos o viento fuerte (Día/Noche).',
+                'E': 'E: Ligeramente Estable - Noches despejadas con viento moderado.',
+                'F': 'F: Moderadamente Estable - Noches despejadas con viento suave (Inversión).'
+            };
 
-            // Animation Loop
-            function animate() {
-                requestAnimationFrame(animate);
-                animationTime += 0.008;
-                update3DParticlesAnimation();
-                threeControls.update();
-                threeRenderer.render(threeScene, threeCamera);
-            }
-            animate();
+            document.querySelectorAll('.stab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.stab-btn').forEach(b => {
+                        b.className = 'stab-btn py-1.5 text-xs font-bold rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:border-blue-500';
+                    });
+                    btn.className = 'stab-btn py-1.5 text-xs font-bold rounded-lg border border-blue-500 bg-blue-600/30 text-blue-300';
+                    state.stability = btn.dataset.stab;
+                    document.getElementById('lbl-stability-desc').textContent = `${state.stability}`;
+                    document.getElementById('stability-info').textContent = stabDescs[state.stability];
+                    updateSimulation();
+                });
+            });
+
+            // Presets (Casos Límites)
+            document.getElementById('preset-ground').addEventListener('click', () => {
+                state.z = 0;
+                document.getElementById('input-z').value = 0;
+                document.getElementById('val-z').textContent = '0 m';
+                updateSimulation();
+            });
+
+            document.getElementById('preset-centerline').addEventListener('click', () => {
+                state.y = 0;
+                document.getElementById('input-y').value = 0;
+                document.getElementById('val-y').textContent = '0 m';
+                updateSimulation();
+            });
+
+            document.getElementById('preset-ground-center').addEventListener('click', () => {
+                state.y = 0;
+                state.z = 0;
+                document.getElementById('input-y').value = 0;
+                document.getElementById('input-z').value = 0;
+                document.getElementById('val-y').textContent = '0 m';
+                document.getElementById('val-z').textContent = '0 m';
+                updateSimulation();
+            });
+
+            document.getElementById('preset-cmax').addEventListener('click', () => {
+                const { xMax } = findCMaxGround();
+                state.x = xMax;
+                state.y = 0;
+                state.z = 0;
+                document.getElementById('input-x').value = xMax;
+                document.getElementById('input-y').value = 0;
+                document.getElementById('input-z').value = 0;
+                document.getElementById('val-x').textContent = `${xMax} m`;
+                document.getElementById('val-y').textContent = '0 m';
+                document.getElementById('val-z').textContent = '0 m';
+                updateSimulation();
+            });
+
+            // View Toggles
+            document.getElementById('btn-toggle-envelope').addEventListener('click', () => {
+                state.showEnvelope = !state.showEnvelope;
+                updatePlumeMesh();
+            });
+
+            document.getElementById('btn-toggle-particles').addEventListener('click', () => {
+                state.showParticles = !state.showParticles;
+                particleSystem.visible = state.showParticles;
+            });
+
+            document.getElementById('btn-toggle-reflection').addEventListener('click', () => {
+                state.showReflection = !state.showReflection;
+                createStack();
+            });
+
+            document.getElementById('btn-reset-cam').addEventListener('click', () => {
+                camera.position.set(-300, 200, 400);
+                controls.target.set(300, 50, 0);
+            });
+
+            document.getElementById('btn-reset-params').addEventListener('click', () => {
+                state.Q = 100;
+                state.u = 5;
+                state.hs = 50;
+                state.dh = 10;
+                state.x = 500;
+                state.y = 0;
+                state.z = 0;
+                state.stability = 'D';
+
+                document.getElementById('input-q').value = 100;
+                document.getElementById('val-q').textContent = '100.0 g/s';
+                document.getElementById('input-u').value = 5;
+                document.getElementById('val-u').textContent = '5.0 m/s';
+                document.getElementById('input-hs').value = 50;
+                document.getElementById('val-hs').textContent = '50 m';
+                document.getElementById('input-dh').value = 10;
+                document.getElementById('val-dh').textContent = '10 m';
+                document.getElementById('input-x').value = 500;
+                document.getElementById('val-x').textContent = '500 m';
+                document.getElementById('input-y').value = 0;
+                document.getElementById('val-y').textContent = '0 m';
+                document.getElementById('input-z').value = 0;
+                document.getElementById('val-z').textContent = '0 m';
+
+                updateSimulation();
+            });
+
+            // Tab Switchers
+            const tabs = [
+                { btn: 'tab-btn-profiles', content: 'tab-content-profiles' },
+                { btn: 'tab-btn-ground', content: 'tab-content-ground' },
+                { btn: 'tab-btn-formula', content: 'tab-content-formula' }
+            ];
+
+            tabs.forEach(tab => {
+                document.getElementById(tab.btn).addEventListener('click', () => {
+                    tabs.forEach(t => {
+                        document.getElementById(t.content).classList.add('hidden');
+                        const b = document.getElementById(t.btn);
+                        b.classList.remove('text-blue-400', 'border-blue-500');
+                        b.classList.add('text-slate-400', 'border-transparent');
+                    });
+                    document.getElementById(tab.content).classList.remove('hidden');
+                    const activeBtn = document.getElementById(tab.btn);
+                    activeBtn.classList.add('text-blue-400', 'border-blue-500');
+                    activeBtn.classList.remove('text-slate-400', 'border-transparent');
+                });
+            });
         }
 
-        function update3DScene(H) {
-            if (!threeScene) return;
-
-            // Scale vertical height consistently with 3D scene geometry
-            // 3D Scene scaling: 500 units X = state.xmax (m)
-            const scaleX = 400.0 / state.xmax;
-            const scaleY = 1.2; // Vertical exaggeration for physical clarity
-            const scaleZ = scaleX * 1.8;
-
-            const chimneyHeight3D = state.hs * scaleY;
-
-            // Chimney geometry resize and top rim alignment
-            chimneyMesh.scale.set(Math.max(0.8, state.d / 2.5), chimneyHeight3D / 50, Math.max(0.8, state.d / 2.5));
-            chimneyMesh.position.set(0, chimneyHeight3D / 2, 0);
-
-            // Stack rim red beacon exact top placement
-            stackRimLight.position.set(0, chimneyHeight3D, 0);
-            stackRimLight.scale.set(Math.max(0.8, state.d / 2.5), Math.max(0.8, state.d / 2.5), 1);
-
-            // Update Ground Texture Footprint
-            update3DGroundTexture();
-
-            // Update badge wind vector text
-            const windBadge = document.getElementById('3d-wind-badge');
-            if (windBadge) {
-                windBadge.innerText = `Viento → ${state.dir}° | ${state.u.toFixed(1)} m/s | Estabilidad ${state.stability}`;
-            }
-        }
-
-        function update3DParticlesAnimation() {
-            if (!plumeParticlesMesh) return;
-
-            const positions = plumeParticlesMesh.geometry.attributes.position.array;
-            const colors = plumeParticlesMesh.geometry.attributes.color.array;
-
-            const scaleX = 400.0 / state.xmax;
-            const scaleY = 1.2;
-            const scaleZ = scaleX * 1.8;
-            const chimneyHeight3D = state.hs * scaleY;
-
-            const speedFactor = (state.u / 5.0) * 0.15;
-
-            for (let i = 0; i < plumeParticleData.length; i++) {
-                const p = plumeParticleData[i];
-
-                // Advance particle position continuously along wind flow
-                p.distFrac += speedFactor * 0.02;
-                if (p.distFrac > 1.0) p.distFrac -= 1.0;
-
-                const xReal = p.distFrac * state.xmax;
-
-                if (xReal <= 1.0) {
-                    // Particle right at Stack Rim Mouth (x = 0)
-                    positions[i * 3] = 0;
-                    positions[i * 3 + 1] = chimneyHeight3D;
-                    positions[i * 3 + 2] = 0;
-
-                    colors[i * 3] = 0.9;
-                    colors[i * 3 + 1] = 0.2;
-                    colors[i * 3 + 2] = 0.2;
-                } else {
-                    const deltaH_curr = calculatePlumeRise(state) * (1 - Math.exp(-xReal / 200));
-                    const H_curr = state.hs + deltaH_curr;
-                    const { sig_y, sig_z } = getSigmas(xReal, state.stability, state.terrain);
-
-                    const x3d = xReal * scaleX;
-                    const yCenter3d = H_curr * scaleY;
-
-                    const y3d = Math.max(0, yCenter3d + (p.randG1 * sig_z * scaleY));
-                    const z3d = p.randG2 * sig_y * scaleZ;
-
-                    positions[i * 3] = x3d;
-                    positions[i * 3 + 1] = y3d;
-                    positions[i * 3 + 2] = z3d;
-
-                    // Color mapping according to local ground/air concentration
-                    const conc = calculateGroundConcentration(xReal, state);
-                    
-                    if (conc > 100) {
-                        colors[i * 3] = 0.95; colors[i * 3 + 1] = 0.2; colors[i * 3 + 2] = 0.2; // Crimson Red
-                    } else if (conc > 40) {
-                        colors[i * 3] = 0.92; colors[i * 3 + 1] = 0.7; colors[i * 3 + 2] = 0.1; // Amber Yellow
-                    } else if (conc > 10) {
-                        colors[i * 3] = 0.13; colors[i * 3 + 1] = 0.77; colors[i * 3 + 2] = 0.36; // Emerald
-                    } else {
-                        colors[i * 3] = 0.05; colors[i * 3 + 1] = 0.65; colors[i * 3 + 2] = 0.91; // Sky Blue
-                    }
-                }
-            }
-
-            plumeParticlesMesh.geometry.attributes.position.needsUpdate = true;
-            plumeParticlesMesh.geometry.attributes.color.needsUpdate = true;
-        }
-
-        function update3DGroundTexture() {
-            if (!groundTextureCtx) return;
-            const ctx = groundTextureCtx;
-            const w = 256;
-            const h = 128;
-
-            ctx.clearRect(0, 0, w, h);
-
-            // Compute ground footprint heat map
-            for (let xPixel = 0; xPixel < w; xPixel++) {
-                const xReal = (xPixel / w) * state.xmax;
-                const conc = calculateGroundConcentration(xReal, state);
-
-                if (conc > 0.5) {
-                    const alpha = Math.min(0.9, conc / 120);
-                    let color = `rgba(14, 165, 233, ${alpha})`;
-                    if (conc > 100) color = `rgba(239, 68, 68, ${alpha})`;
-                    else if (conc > 40) color = `rgba(234, 179, 8, ${alpha})`;
-
-                    ctx.fillStyle = color;
-                    ctx.fillRect(xPixel, h / 4, 2, h / 2);
-                }
-            }
-            if (groundPlaneMesh && groundPlaneMesh.material.map) {
-                groundPlaneMesh.material.map.needsUpdate = true;
-            }
-        }
-
-        function updateAutomatedFeedback(cMax, xMax, deltaH, H) {
-            const container = document.getElementById('feedback-content');
-            
-            let stabilityDesc = "";
-            if (state.stability === 'A' || state.stability === 'B') {
-                stabilityDesc = "<strong>Alta Inestabilidad Térmica:</strong> La fuerte radiación solar genera grandes convecciones verticales. La pluma toca tierra rápidamente cerca de la fuente con picos intensos pero localizados.";
-            } else if (state.stability === 'D') {
-                stabilityDesc = "<strong>Atmósfera Neutra:</strong> Predomina el mezclado mecánico por fricción del viento. Dispersión equilibrada en forma de cono regular.";
-            } else {
-                stabilityDesc = "<strong>Atmósfera Estable (Inversión):</strong> Turbulencia vertical casi nula. La pluma se comprime horizontalmente (abanico) y viaja largas distancias antes de diluirse, desplazando el impacto lejos de la chimenea.";
-            }
-
-            let windEffect = "";
-            if (state.u < 2.0) {
-                windEffect = "<span class='text-amber-400'>Viento Débil:</span> Escasa dilución inicial ($Q/u$ es elevado). Riesgo de acumulación local.";
-            } else if (state.u > 8.0) {
-                windEffect = "<span class='text-sky-300'>Viento Fuerte:</span> Gran efecto diluyente en el eje transversal, pero reduce la sobreelevación pluma ($\Delta h$).";
-            } else {
-                windEffect = "Dilución por velocidad de viento equilibrada.";
-            }
-
-            container.innerHTML = `
-                <div class="bg-slate-950 p-2.5 rounded border border-slate-800 space-y-1">
-                    <p class="text-sky-300 font-semibold">1. Impacto de Estabilidad (${state.stability}):</p>
-                    <p class="text-slate-400">${stabilityDesc}</p>
-                </div>
-
-                <div class="bg-slate-950 p-2.5 rounded border border-slate-800 space-y-1">
-                    <p class="text-amber-300 font-semibold">2. Dinámica del Viento ($u = ${state.u}\,m/s$):</p>
-                    <p class="text-slate-400">${windEffect}</p>
-                </div>
-
-                <div class="bg-slate-950 p-2.5 rounded border border-slate-800 space-y-1">
-                    <p class="text-emerald-300 font-semibold">3. Sobreelevación Térmica ($\Delta h = ${deltaH.toFixed(1)}\,m$):</p>
-                    <p class="text-slate-400">
-                        Los gases salen a ${state.Ts}°C (vs ${state.Ta}°C ambiente). El empuje térmico eleva la altura efectiva a $H = ${H.toFixed(1)}\,m$, reduciendo el pico en superficie un <strong>${Math.round((deltaH / H) * 100)}%</strong> respecto a la chimenea física sola.
-                    </p>
-                </div>
-            `;
-        }
-
-        function loadPreset(key) {
-            if (key === 'inversion') {
-                document.getElementById('input-Q').value = 120;
-                document.getElementById('input-hs').value = 45;
-                document.getElementById('input-Ts').value = 80;
-                document.getElementById('input-u').value = 1.5;
-                document.getElementById('input-stability').value = 'F';
-                document.getElementById('input-terrain').value = 'flat_rural';
-            } else if (key === 'unstable_noon') {
-                document.getElementById('input-Q').value = 150;
-                document.getElementById('input-hs').value = 40;
-                document.getElementById('input-Ts').value = 150;
-                document.getElementById('input-u').value = 2.5;
-                document.getElementById('input-stability').value = 'A';
-                document.getElementById('input-terrain').value = 'flat_rural';
-            } else if (key === 'high_wind') {
-                document.getElementById('input-Q').value = 200;
-                document.getElementById('input-hs').value = 60;
-                document.getElementById('input-Ts').value = 110;
-                document.getElementById('input-u').value = 10.0;
-                document.getElementById('input-stability').value = 'D';
-                document.getElementById('input-terrain').value = 'flat_rural';
-            } else if (key === 'urban_tall') {
-                document.getElementById('input-Q').value = 250;
-                document.getElementById('input-hs').value = 120;
-                document.getElementById('input-Ts').value = 180;
-                document.getElementById('input-u').value = 4.5;
-                document.getElementById('input-stability').value = 'C';
-                document.getElementById('input-terrain').value = 'urban';
-            } else if (key === 'challenge_1') {
-                document.getElementById('input-Q').value = 200;
-                document.getElementById('input-hs').value = 35;
-                document.getElementById('input-Ts').value = 70;
-                document.getElementById('input-u').value = 2.5;
-                document.getElementById('input-stability').value = 'E';
-                document.getElementById('input-terrain').value = 'flat_rural';
-            } else if (key === 'challenge_2') {
-                document.getElementById('input-Q').value = 180;
-                document.getElementById('input-hs').value = 40;
-                document.getElementById('input-Ts').value = 60;
-                document.getElementById('input-u').value = 1.0;
-                document.getElementById('input-stability').value = 'F';
-                document.getElementById('input-terrain').value = 'flat_rural';
-            }
-
+        // Initialize Application
+        window.addEventListener('load', () => {
+            init3D();
+            initCharts();
+            bindEvents();
             updateSimulation();
-        }
-
-        function toggleScenarioComparison() {
-            if (!state.isComparing) {
-                state.savedScenario = { ...state };
-                state.isComparing = true;
-                document.getElementById('lbl-compare').innerText = "Limpiar Comparación";
-                document.getElementById('btn-compare').className = "w-full py-2 px-3 bg-purple-600/40 hover:bg-purple-600/60 border border-purple-500/50 rounded-lg text-purple-200 font-medium transition flex items-center justify-center gap-2";
-                document.getElementById('comp-legend-tag').classList.remove('hidden');
-            } else {
-                state.isComparing = false;
-                state.savedScenario = null;
-                document.getElementById('lbl-compare').innerText = "Guardar como Escenario A para Comparar";
-                document.getElementById('btn-compare').className = "w-full py-2 px-3 bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/50 rounded-lg text-indigo-200 font-medium transition flex items-center justify-center gap-2";
-                document.getElementById('comp-legend-tag').classList.add('hidden');
-            }
-            updateSimulation();
-        }
-
-        function resetToDefaults() {
-            document.getElementById('input-Q').value = 100;
-            document.getElementById('input-hs').value = 50;
-            document.getElementById('input-Ts').value = 120;
-            document.getElementById('input-vs').value = 12;
-            document.getElementById('input-d').value = 2.5;
-            document.getElementById('input-u').value = 4.0;
-            document.getElementById('input-dir').value = 270;
-            document.getElementById('input-stability').value = 'D';
-            document.getElementById('input-Ta').value = 20;
-            document.getElementById('input-rh').value = 60;
-            document.getElementById('input-terrain').value = 'flat_rural';
-            document.getElementById('input-xmax').value = 5000;
-            document.getElementById('preset-select').value = 'custom';
-            updateSimulation();
-        }
-
-        function onWindowResize() {
-            const container = document.getElementById('threejs-container');
-            if (container && threeCamera && threeRenderer) {
-                const w = container.clientWidth;
-                const h = container.clientHeight;
-                threeCamera.aspect = w / h;
-                threeCamera.updateProjectionMatrix();
-                threeRenderer.setSize(w, h);
-            }
-            update2DCanvas(state.hs + calculatePlumeRise(state));
-        }
+        });
     </script>
 </body>
 </html>
